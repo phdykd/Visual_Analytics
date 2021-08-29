@@ -1,0 +1,821 @@
+---
+title: "problem_set_2"
+author: "Yusuf Kemal Demir; Ph.D."
+date: "10/22/2020"
+output:
+  word_document:
+    toc: yes
+    toc_depth: '2'
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    theme: united
+    toc: yes
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Visual Analytics  
+## Task: CMPD Traffic Stops 
+
+
+# Details
+
+- Who did you collaborate with: Myself
+- Approximately how much time did you spend on this problem set: 3-5 hours
+- What, if anything, gave you the most trouble: xxxxx
+
+## Instructions
+
+In addition to running the code, you will need to do two things: either write in complete sentences a response or write R code to fill in a chunk.
+
+- "xxxxx" = Write, in complete English sentences, your response. 1-2 sentences is sufficient.
+
+- "**Plot**" = Write R code in the chunk corresponding to the instructions.
+
+# Analyzing CMPD Traffic Stops
+
+For this problem set, we'll examine a data set of stops by the Charlotte-Mecklenburg Police Department (CMPD). 
+
+Our focus will be to understand what factors are related to whether someone is searched or not for a traffic stop.
+
+For our data set, you'll load the csv file we saved in the setup. This should be in your data folder.
+
+## Install packages
+
+Install the `tidyverse`,`scales`,`ggspatial`,`sf` packages
+
+```{r install tidyverse, scales, ggpatial, sf, message=F, warning=F}
+# install.packages('tidyverse', repos="http://cran.us.r-project.org")
+# install.packages('scales')
+# install.packages('ggspatial')
+# install.packages('sf')
+```
+
+## Load libraries and df
+
+Load the `tidyverse`,`scales`,`ggspatial`,`sf` libraries
+
+
+```{r load_packages-data, warning=F,message=F}
+library(tidyverse)
+library(scales)
+library(ggspatial)
+library(sf)
+
+df<-read.csv(file='data/Officer_Traffic_Stops.csv')
+
+```
+
+
+```{r load-packages-data, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(scales)
+library(ggspatial) 
+
+df <- read_csv("data/Officer_Traffic_Stops.csv")
+```
+
+## Demographics of drivers
+
+First, look at the data using the `glimpse()` function from `dplyr`
+
+```{r glimpse}
+glimpse (df)
+```
+
+Notice the different variable types: character (chr), num (numeric), and datetime (POSIXct).
+
+Let's consider our target variable: `Was_a_Search_Conducted`.
+
+**Plot** a bar chart that counts the number of records by `Was_a_Search_Conducted`.
+```{r digest, message=F, warning=F}
+
+# install.packages('digest')
+
+```
+
+```{r library digest, message=F, warning=F}
+library(digest)
+```
+
+
+
+
+```{r bar Was_a_Search_Conducted}
+ggplot(data=df)+
+  geom_bar(mapping = aes(x=Was_a_Search_Conducted))
+```
+
+
+```{r bar Was_a_Search_Conducted, coord flip}
+ggplot(data=df)+
+  geom_bar(mapping = aes(x=Was_a_Search_Conducted))+coord_flip()
+```
+
+How well balanced is the data set by this field? 
+
+
+Bar charts can be used for ordinal and nominal data sets. Geom_bar requires only one discrete variable as an aesthetic. Y variable counts by default the number of counts. However geom_col requires x and y variables inside the aesthetic of data.
+
+It is unbalanced, and the skewness is towards to " Search Not Conducted". The total count was 68488, and "Search Not Conducted" was around 65K-70K.
+
+
+Next, let's consider the age range of the driver. 
+
+**Plot** a histogram of `Driver_Age`. Determine an appropriate number of bins.
+
+```{r histogram Driver_Age}
+ggplot(data = df)+
+  geom_histogram(mapping=aes(x=Driver_Age))
+
+```
+
+Once you go above (around) 40-50 bins, you'll notice some points stick out. 
+
+What is happening? 
+
+Histogram chart is only used to plot the frequency of score occurrences in a continuous data set that has been divided into classes, called bins.Notice that, unlike a bar chart, there are no "gaps" between the bars (although some bars might be "absent" reflecting no frequencies). 
+
+Driver_Age (continuous variable) data was split into intervals, called bins.  Each bin contains the number of occurrences of scores in the data set that are contained within that bin. For the above data set, the frequencies in each bin have been tabulated along with the scores that contributed to the frequency in each bin.
+
+There is no right or wrong answer as to how wide a bin should be, but there are rules of thumb. You need to make sure that the bins are not too small or too large. Above-mentioned histogram use same data as the below-mentioned data, but have smaller bins.
+
+We can see from the above-mentioned histogram that the default bins=30  is not very convenient  to show data and the underlying pattern  of the data to be easily seen. Below-mentioned histogram's bins provide more insight. For instance, it shows the frequency of some age groups (25,29, 35, 43, 48, 53,57, 59, 69) can be listed in descending order, which means this stick out points are stopped more. 
+
+
+```{r histogram Driver_Age, bins 45}
+ggplot(data = df)+
+  geom_histogram(mapping = aes(x=Driver_Age),bins = 45)
+```
+
+
+**Plot** a density plot of `Driver_Age`. Add in a fill to be "lightblue". Determine an appropriate kernel density to use (`adjust`).
+
+```{r density plot Driver_Age}
+ggplot(data=df)+
+  geom_density(mapping = aes(Driver_Age), fill='lightblue')
+
+```
+
+
+``` {r density plot Driver_Age, fill lightblue, kernel adjust, coisine}
+ggplot(df, aes(Driver_Age))+
+  geom_density(fill='lightblue', adjust=2.0, kernel='cosine')
+
+```
+
+```{r density plot Driver_Age, fill lightblue, kernel adjust, gaussian default}
+ggplot(data=df,aes(Driver_Age))+
+geom_density(fill='lightblue',adjust=2.0) #adjust= 10 very smooth, #adjust=0.1 crazy bumpy
+
+```
+
+**Plot** a box plot with `Was_a_Search_Conducted` on the x-axis and `Driver_Age` on the y-axis.
+
+```{r boxplot Was_a_Search_Conducted` vs Driver_Age}
+
+ggplot(df,aes(Was_a_Search_Conducted, Driver_Age))+
+  geom_boxplot()
+
+```
+
+
+
+```{r Was_a_Search_Conducted` vs Driver_Age, outlier.shape=NA} 
+ggplot(data=df)+
+  geom_boxplot(mapping = aes(x = Was_a_Search_Conducted, y = Driver_Age),outlier.shape = NA)+
+  ylim(10,78)+
+  scale_y_continuous(breaks=seq(10, 80, 4))  # Ticks from 0-10, every 4
+```
+
+**Plot** a violin plot.
+
+```{r violin}
+ggplot(df,aes(Was_a_Search_Conducted, Driver_Age))+
+  geom_violin(color='purple',fill='lightblue',linetype= 'dashed', alpha=0.2)
+
+```
+
+From the plots above, do you think the age of the driver is a significant factor in whether a search was conducted? Why or why not? 
+
+For search not conducted:Q1= 25, Median (Q2)=33, Q3=45, and outliers are condensed in age 75-110. The IQR (Q3-Q1)= 20
+
+For search conducted:Q1= 21, Median (Q2)=25, Q3=35, and outliers are condensed in age 50-77.The IQR (Q3-Q1)= 14
+
+Violin plots also confirm the distribution difference for search of the Driver_Age .
+
+The Driver_Age seems to be a factor whether search conducted or not. 
+
+## Date of stop
+
+Let's plot the number of stops by time. 
+
+Recalling part one, the `Month_of_Stop` variable is a character, not a date variable. The datatime's are simply when the data was collected; not when the stop occurred. Therefore, we'll need to convert the `Month_of_Stop` variable from a character to a Date format.
+
+Let's first cleanup the date field using `tidyverse` packages like `stringr` and `lubridate`.
+
+```{r df}
+df
+```
+
+
+
+```{r date-cleanup}
+library(stringr)
+library(lubridate)
+
+
+df <- mutate(df, Month_of_Stop = str_replace_all(Month_of_Stop, "/","-")) # replace "/" with "-"
+df <- mutate(df, Month_of_Stop = paste(df$Month_of_Stop,"-01")) # add in day
+df <- mutate(df, Date = ymd(Month_of_Stop)) # created a date field
+df
+```
+
+**Plot** a line chart with the number of traffic stops for each month (hint: start with the `count()` function by Date then feed into ggplot. Remember the count variable is named 'n'.).
+
+
+```{r stops count Date}
+df_stops<-df%>%count(Date)
+df_stops
+```
+
+```{r stops}
+df_stops<-df%>%
+  count(Date)
+
+ggplot(df_stops,aes(Date,n))+geom_line()+scale_x_date(date_breaks = '2 months',date_labels = '%Y%m')
+df_stops
+
+```
+
+
+What is the trend (i.e., long term rate of change) of the number of traffic stops in Charlotte? 
+
+
+There is almost 'V' shape trend between the two peaks,201604 to 201705, where the deep cup was on 201609. From 201601 to 201712, there was around 250 cases of drop. Stops were started to slow down on 201604 for 2 months; and showed kinky increase for further 2 months.There is a steady  increase for 5 months. The peak point reached on 201704. Stops were decreased around 1250 cases from end of second quarter till the end of 2017.
+
+
+**Plot** the same plot but add in `facet_wrap()` by the `Reason_for_Stop` variable.
+
+```{r stops-by-reason count}
+df_s_reason<-df%>%count(Reason_for_Stop, Date)
+df_s_reason
+```
+
+
+```{r stops-by-reason}
+ggplot(df_s_reason,aes(Date, n))+
+  geom_line()+
+  facet_wrap(~ Reason_for_Stop)
+
+```
+What is a problem with this plot? 
+
+Facets divide a plot into subplots based on the values of one or more discrete variables.
+
+1-First problem is, by default, the same scales are used for all panels.
+Each subplot has same y-axis value range (0-1500) that does not convenient  to show data and the underlying pattern in most of the panels.
+
+2-Second issue is overlapped x-axis values (Date).
+
+To address this problem, you will need to figure out how to adjust the scale. To do this, you need to use R's documentation to see whether there is a parameter in `facet_wrap`.
+
+Go to your RStudio console and type `?facet_wrap`.
+
+What parameter allows you to modify the scales of `facet_wrap`?
+
+1- Scales can be fixed ("fixed", the default), free ("free"), or free in one dimension ("free_x", "free_y")?
+
+By default, the same scales are used for all panels. You can allow scales to vary across the panels with the `scales` argument.
+Free scales make it easier to see patterns within each panel, but  harder to compare across panels.
+Set scales to let axis limits vary across facets
+x and y axis limits adjust to individual facets
+• "free_x" - x axis limits adjust
+• "free_y" - y axis limits adjust
+
+
+```{r stops by reason, scales free_y, limit x and position }
+ggplot(df_s_reason, aes(Date,n))+
+         geom_line()+
+         facet_wrap(~ Reason_for_Stop, scales='free_y')+ 
+         scale_x_date(limits = as.Date(c('2016-01-01','2017-12-01')))
+```
+
+
+```{r stops by reason, scales free, scale x break and labels}
+ggplot(df_s_reason,aes(Date,n))+
+  geom_line()+
+  facet_wrap(~ Reason_for_Stop, scales='free')+
+  scale_x_date(date_breaks = '1 year',date_labels = '%Y') 
+
+```
+
+2-Control the number of rows and columns with nrow and ncol
+```{r stops-by-reason nrow and ncol}
+ggplot(df_s_reason,aes(Date,n))+geom_line(colour='red')+
+  facet_wrap(~ Reason_for_Stop, nrow = 2, ncol=5, scales='free_y', strip.position = 'top')+
+  scale_x_date(date_breaks = '1 year',date_labels = '%Y')
+```
+3-Cosmetics
+
+```{r stops-by-reason nrow and ncol, scale_x_date, scales, strip.position, labs, strip.text, aspect ratio}
+ggplot(df_s_reason,aes(Date,n))+geom_line(colour='red')+
+  facet_wrap(~ Reason_for_Stop, nrow = 2, ncol=5, scales='free_y', strip.position = 'top')+
+  scale_x_date(date_breaks = '1 year', date_labels = '%Y')+
+  labs(title = 'CMPD stop reason time series')+
+  theme(strip.background = element_rect(colour = 'blue', fill='white'),strip.text = element_text(colour = "blue", face = "bold", size =6),
+        text = element_text(size=10), aspect.ratio = 5/3)
+```
+4- Vars, labeller also could work if we had multiple variables.
+
+
+**Plot** the same plot but with a free y-axis scale.
+
+```{r stops-by-reason-2}
+ggplot(df_s_reason,aes(Date,n))+geom_line()+facet_wrap(~ Reason_for_Stop, scales='free_y')+scale_x_date(date_breaks = '1 year', date_labels = '%Y')
+```
+
+Which type of police stop has had the most volatility (i.e., big swings in number of stops)? 
+
+Vehicle Equipment has the most volatility since the reason of police stops changed 3.4 fold (from 150 to 525)in 2016-2017.
+
+
+What is one problem with allowing the y-axis be free?
+
+By default, the same scales are used for all panels. You can allow scales to vary across the panels with the `scales` argument.
+Free scales make it easier to see patterns within each panel, but  harder to compare across panels.
+
+In order to see data pattern in y-axis for each panel, we needed free_y scales.
+
+
+Small multiples tends to be less effective when each of the variables are on different scales or magnitudes.
+
+Let's consider instead CMPD traffic stops but by CMPD division. These are more even spread by division than the type of stop.
+
+**Plot** a line chart (optional points too) for stops by `Date` (x axis) and counts ('n', or whatever you named your count variable) (y axis). (hint: to modify how the date is shown, use the layer `scale_x_date(date_labels = "%Y") +` to show only the year. Feel free to modify by looking at `?scale_x_date`.)
+
+```{r stops-by-division}
+df_division<-df%>%count(CMPD_Division,Date)
+df_division
+```
+
+
+```{r stops-by-division geom line point nrow ncol}
+ggplot(df_division,aes(Date,n))+
+  geom_line(colour='red')+geom_point()+facet_wrap(~ CMPD_Division, nrow = 2, ncol=7)+
+  scale_x_date(date_break='1 year',date_labels = "%y")+
+  labs(title = 'CMPD Division time series')+
+  theme(strip.background = element_rect(colour = 'blue', fill='white'),strip.text = element_text(colour = "blue", face = "bold", size =6),text = element_text(size=10))
+```
+
+
+What are three observations you can make about the number of police stops by divison? (hint: just write about what's in the data.)
+
+1. Not identified locations marked as the minimum of stops (stops 26, date 20170501) by CMPD Division.
+
+2. Providence Division has the highest peak (stops 495, date 20170701), which was followed by North Tryon Division (stops 483, date 20170201).
+
+3. The number of stops has 7.6 fold (min 64, max 485) and 3.4 fold (min 137, max 468) increase in North Tryon Division, and North Division, respectively. 
+
+Next, this doesn't help tell us where these areas are. For that, let's use a shape file to create a chloropleth of stops by division.
+
+## Geography
+
+For this example, we'll create a cholorpleth for the number of police stops by police division.
+
+To do this, we need to use the `sf` package. (For help along the way, see [this tutorial](http://strimas.com/r/tidy-sf/) on `sf` package.)
+
+```{r load-sf}
+library(sf); library(viridis)
+cmpd <- st_read("./data/CMPD_Police_Divisions/CMPD_Police_Divisions.shp")
+```
+
+Note that while we have five files, we only load in the shapefile (`.shp`) file. This is typical but know that to use this file you would need the other four files in the same folder as your shapefile.
+
+**Plot** cmpd using the `geom_sf` package where you provide `fill = DNAME` as the only aesthetic. Add in a title saying "CMPD Divisions" and add the `theme_bw()` theme to make translate the file into the black and white template.
+
+```{r geom_sf,  warning=FALSE, message=FALSE}
+ggplot(cmpd)+
+  geom_sf(aes(fill=DNAME))+
+  labs(title='CMPD Divisions')
+```
+
+
+```{r geom_sf2,  warning=FALSE, message=FALSE}
+ggplot(cmpd)+
+  geom_sf(aes(fill=DNAME))+
+  theme_bw()+
+  labs(title='CMPD Divisions')
+```
+
+
+
+One problem with this map is it's hard to read the division names. That is, it may be better to remove the legend and put the labels of each division within the plot.
+
+To do this, we can use the related `geom_sf_label()` geom, using the name of the division as the aesthetic label.
+
+**Plot** the same plot from above but with the name of the division as the label. 
+
+1. You'll likely need to reduce the size of the label, using the `size` paramater. You should likely set the `size` to under 2. 
+
+2. Make sure to remove the legend (it's redundant and no longer necessary).
+
+3. Create a new variable named `Name` that removes the term " Division". This term is redundant and takes up a lot of space in the labels from `DNAME`. To do this step, use this snippet of code at the top of your pipeline:
+
+```{r eval=F, warning=F, message=F}
+cmpd<-cmpd %>%
+  mutate(Name = as.character(DNAME)) %>%
+  mutate(Name = str_replace_all(Name, " Division",""))
+```
+
+
+4. Save it as an object named `g`. Make sure to call it once so that the map will output.
+
+```{r eval=F, geom-labels, warning=FALSE, message=FALSE}
+g<-ggplot(cmpd)+
+  geom_sf(aes(fill=Name))+
+  theme_bw()+
+  labs(title='CMPD Divisions')+
+  geom_sf_label(aes(label=Name),size = 1.9)+
+  theme(legend.position = "none")+
+  theme(axis.title.x=element_blank())
+g
+```
+
+## Advanced Plot:
+
+Now, let's create a chloropleth. Below is the code to create an advanced plot.
+
+In this problem, you need to explain what each step below is doing:
+
+- `mutate()`: adds new variables and preserves existing ones.
+- `inner_join()`: The mutating joins add columns from y to x, matching rows based on the keys, where inner_join is one of them. inner_join() includes all rows in x and y. In essence, it joins variables from two data frame.
+- `mutate()`: creates new variable and preserves existing ones, as executed in the case of 'Name' of CMPD_Division example. 
+- `geom_sf()`: It is an unusual geom because it will draw different geometric objects depending on what simple features are present in the data: you can get points, lines, or polygons (as executed in Charlotte Mecklenburg division). For text and labels, you can use geom_sf_text() and geom_sf_label().
+- `scale_fill_viridis()`: Uses and fills the viridis color scale. Colorful,
+Perceptually uniform, Robust to colorblindness,Pretty.
+- `labs()`: Change axis labels and legend titles
+- `annotation_scale()`:Spatial-aware scalebar annotation. location, width_hint can be used along with it.
+- `facet_wrap()`:wraps a 1d sequence of panels into 2d. This is generally a better use of screen space than facet_grid() because most displays are roughly rectangular.Facets divide a plot into subplots based on the values
+of one or more discrete variables. It wraps facets into a rectangular layout
+- `theme_bw()`: The classic dark-on-light ggplot2 theme. May work better for presentations displayed with a projector.
+- `theme()`: (what are each of the options doing in `theme()`?) Themes are a powerful way to customize the non-data components of your plots: i.e. titles, labels, fonts, background, gridlines, and legends. Themes can be used to give plots a consistent customized look.
+- `ggsave()`: is a convenient function for saving a plot. It defaults to saving the last plot that you displayed, using the size of the current graphics device. It also guesses the type of graphics device from the extension.
+
+```{r adv-plot}
+cmpd_chloropleth <- cmpd %>% 
+  mutate(CMPD_Division = as.character(DNAME)) %>% 
+  inner_join(count(df, CMPD_Division, Date), by = "CMPD_Division") %>%
+  mutate(Year = lubridate::year(Date)) %>%
+  ggplot() +
+  geom_sf(aes(fill = n)) +
+  scale_fill_viridis("Traffic Stops", labels = scales::comma) +
+  labs(title = "CMPD Traffic stops by CMPD Division",
+       caption = "Source: CMPD") +
+  annotation_scale(location = "bl", width_hint = 0.2) +
+  facet_wrap(~Year) +  
+  theme_bw() +
+  theme(legend.position = "bottom",
+        plot.title = element_text(face = "bold", size = rel(1.5)),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.ticks.y=element_blank())
+
+cmpd_chloropleth
+
+ggsave(cmpd_chloropleth, filename = "cmpd_chloropleth.pdf",
+       width = 7, height = 5, units = "in")
+ggsave(cmpd_chloropleth, filename = "cmpd_chloropleth.png",
+       width = 7, height = 5, units = "in")
+```
+
+###Bonus (play it for fun)
+
+## Choosing a ggplot extensions 
+
+Now, select **one** of the ggextension libraries below and install the package (through CRAN):
+
+- [`ggridges`](https://cran.r-project.org/web/packages/ggridges/vignettes/introduction.html) / [example to recreate](https://cran.r-project.org/web/packages/ggridges/vignettes/introduction.html#varying-fill-colors-along-the-x-axis)^[Run both plots. Make sure to install the `viridis` package or else you'll get an error!]
+
+- [`ggalt`](https://github.com/hrbrmstr/ggalt) / [example to recreate](https://github.com/hrbrmstr/ggalt#horzon-chart)^[Make sure to install `hrbrthemes`!]
+
+- [`ggrepel`](https://github.com/slowkow/ggrepel) / [example to recreate](https://github.com/slowkow/ggrepel/blob/master/vignettes/ggrepel.md#align-labels-on-the-left-or-right-edge)
+
+- [`ggstatsplot`](https://github.com/IndrajeetPatil/ggstatsplot) / [example to recreate](https://github.com/IndrajeetPatil/ggstatsplot#ggscatterstats)^[Run all three examples in the `ggscatterstats` section.]
+
+**Plot** the related example
+
+```{r ggextension-examples 1, ggridges, message=F, warning=F}
+# install.packages('ggridges')
+library(ggplot2)
+library(ggridges)
+
+d <- data.frame(
+  x = rep(1:5, 3) + c(rep(0, 5), rep(0.3, 5), rep(0.6, 5)),
+  y = c(rep(0, 5), rep(1, 5), rep(3, 5)),
+  height = c(0, 1, 3, 4, 0, 1, 2, 3, 5, 4, 0, 5, 4, 4, 1))
+
+ggplot(d, aes(x, y, height = height, group = y, fill = factor(x+y))) +
+  geom_ridgeline_gradient() +
+  scale_fill_viridis_d(direction = -1, guide = "none")
+```
+
+```{r ggextension-examples 2, ggridges, message=F, warning=F}
+
+ggplot(lincoln_weather, aes(x = `Mean Temperature [F]`, y = Month, fill = stat(x))) +
+  geom_density_ridges_gradient(scale = 3, rel_min_height = 0.01) +
+  scale_fill_viridis_c(name = "Temp. [F]", option = "D") +
+  labs(title = 'Temperatures in Lincoln NE in 2016')
+```
+
+
+```{r lincoln weather, message=F, warning=F}
+lincoln_weather
+```
+
+Now, with the same package you ran, make a **plot** with that package and the gapminder data. You can choose any of the data frames (i.e., years). Make sure your plot has at least six functions (e.g., ggplot() + geom_point() is two functions and `dplyr` functions count as well.)
+
+```{r gapminder, message=F, warning=F}
+# install.packages("gapminder")
+library(gapminder)
+
+head(gapminder)
+tail(gapminder)
+gapminder
+```
+
+
+```{r ggextension-custom 1, warning=F, message=F}
+ggplot(gapminder, aes(x=gdpPercap,y=continent, fill = stat(x)))+
+  geom_density_ridges_gradient(scale = 0.9, rel_min_height = 0.02, show.legend = T) + 
+  scale_fill_viridis_c(name = "continent", option = "C") +
+  labs(x = "gdpPercap",y = "continent") +
+  ggtitle("gdpPercap vs Continent") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+```{r ggextension-custom 2, warning=F, message=F}
+
+ggplot(gapminder[gapminder$year==2007,], aes(gdpPercap, year))+
+  geom_density_ridges(rel_min_height = 0.005) +
+  scale_y_discrete(expand = c(0.01, 0)) +
+  scale_x_continuous(expand = c(0.01, 0)) +
+  theme_ridges()+
+  labs(x = "gdpPercap",y = "year 2007") +
+  ggtitle("gdpPercap vs 2007 year") +
+  theme(plot.title = element_text(hjust = 0.5),
+  axis.text.y=element_blank(),axis.ticks=element_blank())
+  
+```
+
+
+
+
+```{r ggextension-custom 3, warning=F, message=F}
+ggplot(gapminder[gapminder$year==2007,], aes(gdpPercap, year))+ 
+  geom_point(color='blue')+
+  labs(x = "gdpPercap",y = "continent") +
+  ggtitle("gdpPercap vs Continent") +
+  theme(plot.title = element_text(hjust = 0.5))+
+  facet_wrap(~continent)+
+  scale_y_continuous(breaks=seq(0, 2007, 2007))
+```
+
+
+
+
+```{r ggextension-custom 4, warning=F, message=F}
+ggplot(gapminder, aes(gdpPercap, lifeExp, label=country, color=continent))+ 
+  geom_point(position = position_jitter(), size=0.5, alpha=1)+
+  labs(x = "gdpPercap",y = "lifeExp") +
+  ggtitle("gdpPercap vs lifeExp") +
+  theme(plot.title = element_text(hjust = 0.5))+
+  coord_flip()+
+  facet_wrap(~continent)+
+  scale_x_continuous(breaks=seq(0, 120000, 30000))# Ticks from 0-120000, every 30000)
+
+```
+
+```{r ggextension-custom 5, warning=F, message=F}
+
+ggplot(
+  filter(gapminder, year==2007, gdpPercap>35000), aes(gdpPercap, lifeExp, label = country, color=continent))+
+  geom_point( color = "red") + 
+  facet_wrap(~continent) +
+  theme_bw() +
+  coord_flip() +
+  theme(legend.position="none")+
+  labs(title = "2007 High Quality Life")
+```
+
+
+```{r ggextension-custom 6, warning=F, message=F}
+
+ggplot(
+  filter(gapminder, year==2007, gdpPercap<6000), aes(gdpPercap, lifeExp, label = country, color=continent))+
+  geom_point( color = "red") + 
+  facet_wrap(~continent) +
+  theme_bw() +
+  coord_flip() +
+  theme(legend.position="none")+
+  labs(title = "2007 Low Quality Life")
+```
+
+
+```{r ggextension-custom 7, warning=F, message=F}
+Am<-subset(gapminder,continent=='Americas')
+ggplot(Am, aes(lifeExp, country, fill = stat(x)))+ 
+  geom_density_ridges_gradient(scale =3, rel_min_height = 0.01, show.legend = T)+
+  scale_fill_viridis_c(name = "lifeExp", option = "C") +
+  theme(plot.title = element_text(face = "bold", size = rel(1.5)),
+  axis.text.y=element_text(size=8))+
+  labs(x = "lifeExp",y = "Americas") +
+  ggtitle("lifeExp @ America") +
+  scale_x_continuous(breaks=seq(0, 100, 20))# Ticks from 0-100, every 20
+```
+
+```{r ggextension-custom 8, warning=F, message=F}
+ggplot(Am, aes(gdpPercap, country, fill = stat(x)))+ 
+  geom_density_ridges_gradient(scale =4, rel_min_height = 0.02, show.legend = T)+
+  scale_fill_viridis_c(name = "gdpPercap", option = "C") +
+  theme(plot.title = element_text(face = "bold", size = rel(1.5)),
+  axis.text.y=element_text(size=8))+
+  labs(x = "gdpPercap",y = "Americas") +
+  ggtitle("gdpPercap @ America") + 
+  scale_x_continuous(breaks=seq(0, 50000, 10000))
+ 
+```
+
+```{r ggextension-custom 9, warning=F, message=F}
+Om<-subset(gapminder,continent=='Oceania')
+ggplot(Om, aes(lifeExp, country, fill = stat(x)))+ 
+  geom_density_ridges_gradient(scale =1, rel_min_height = 0.01, show.legend = T)+
+  scale_fill_viridis_c(name = "lifeExp", option = "C") +
+  theme(plot.title = element_text(face = "bold", size = rel(1.5)),
+  axis.text.y=element_text(size=8))+
+  labs(x = "lifeExp",y = "Oceania") +
+  ggtitle("lifeExp @ Oceania") +
+  scale_x_continuous(breaks=seq(0, 100, 20))# Ticks from 0-100, every 20
+```
+
+```{r summary gapminder}
+summary(Om)
+```
+
+
+
+```{r summary Am}
+summary (Am)
+```
+
+
+
+Describe what you have found using that plot (write at least 3 sentences):
+
+Ridgelines drawn based on data density estimation;
+
+1. Graph#1 shows that Oceania continent had the highest gdpPercapita.
+
+2. Graph#2 shows that majority had <20000 gdpPercap in 2007.
+
+3. Graph#3 shows that Africa countries have the lowest gdpPercap (<15000) in 2007. 
+
+4. Graph#4 shows that  countries in Asia and Europe have the highest gdpPercap. 
+
+5. Graph#5 shows countries that have high lifeExp and gdpPercap (>35000) in 2007.
+
+6- Graph#6 shows that countries that have low lifeExp and gdpPercap (<6000) mostly consolidated in Africa.
+
+7- Graph#7 shows that USA&Canada have the highest lifeExp in America continent.
+
+8- Graph#8 shows that USA has the highest gdpPercapita in America continent.
+
+9- Graph#9 Australia seems to have very very slightly higher lifeExp than New Zealand in Oceania continent.
+
+10- Overall in 2007 data, America: USA, Canada, Asia: Kuwait, Singapore, Hong Kong, Europe: Norway, Ireland, Swirzerland.. have the highest life quality in terms of high gdpPercap and lifeExp
+
+11-Overall in 2007 data, Africa: Congo, America: Haiti USA, Canada, Asia: Afghanistan, Europe: Albania have the lowest life quality in terms of low gdpPercap and lifeExp
+
+12- geom_density_ridges_gradient and plotly was not compatible.
+
+
+## Intro to interactivity
+
+For even more fun, **plot** an interactive HTML plot using the code for any of the plots above (fair warning, some of the ggextensions may not work well). 
+
+The easiest way to do this is to use the `plotly` package (install it with the "Packages" panel in RStudio), and then to use its `ggplotly()` function.
+
+I've given you some commented-out code below (commented out so that R doesn't yell at you about the code not working when you knit). 
+
+Also, check out [the documentation](https://plot.ly/ggplot2/), especially [this page](https://plot.ly/ggplot2/interactive-tooltip/) about customizing the tooltips that show up when you hover over points or areas.
+
+```{r interactive, message=FALSE, warning=F}
+
+# devtools::install_github("ropensci/plotly")
+library(plotly)
+```
+
+```{r interactive 1, message=FALSE, warning=F}
+
+my_cool_plot <-ggplot(gapminder, aes(gdpPercap, lifeExp, label=country, color=continent))+ 
+  geom_point(position = position_jitter(), size=0.5, alpha=1)+
+  labs(x = "gdpPercap",y = "lifeExp") +
+  ggtitle("gdpPercap vs lifeExp") +
+  theme(plot.title = element_text(hjust = 0.5))+
+  coord_flip()+
+  facet_wrap(~continent)+
+  scale_x_continuous(breaks=seq(0, 120000, 30000))# Ticks from 0-120000, every 30000)
+
+
+my_cool_plot
+```
+
+
+
+```{r plotly, my_cool_plot, message=F, warning=F}
+ggplotly(my_cool_plot)
+```
+
+
+
+```{r interactive 2, message=FALSE, warning=F}
+
+my_cool_plot2<-ggplot(
+  filter(gapminder, year==2007, gdpPercap>35000), aes(gdpPercap, lifeExp, label = country, color=continent))+
+  geom_point( color = "red") + 
+  facet_wrap(~continent) +
+  theme_bw() +
+  coord_flip() +
+  theme(legend.position="none")+
+  labs(title = "2007 High Quality Life")
+my_cool_plot2
+
+```
+
+
+```{r plotly, my_cool_plot 2, message=F, warning=F}
+ggplotly(my_cool_plot2)
+```
+
+
+
+```{r interactive 3, message=FALSE, warning=F}
+
+my_cool_plot3<-ggplot(
+  filter(gapminder, year==2007, gdpPercap<6000), aes(gdpPercap, lifeExp, label = country, color=continent))+
+  geom_point( color = "red") + 
+  facet_wrap(~continent) +
+  theme_bw() +
+  coord_flip() +
+  theme(legend.position="none")+
+  labs(title = "2007 Low Quality Life")
+
+my_cool_plot3
+
+ggplotly(my_cool_plot3)
+
+```
+
+
+
+```{r interactive 4, message=FALSE, warning=F}
+
+my_cool_plot4<-ggplot(df_division,aes(Date,n))+
+  geom_line(colour='red')+geom_point()+facet_wrap(~ CMPD_Division, nrow = 2, ncol=7)+
+  scale_x_date(date_break='1 year',date_labels = "%y")+
+  labs(title = 'CMPD Division time series')+
+  theme(strip.background = element_rect(colour = 'blue', fill='white'),strip.text = element_text(colour = "blue", face = "bold", size =6),text = element_text(size=10))
+
+my_cool_plot4
+ggplotly(my_cool_plot4)
+```
+
+
+
+```{r tinytex, message=F, warning=F}
+# install.packages('tinytex')
+# tinytex::install_tinytex()
+
+```
+
+```{r library tinytex, message=F, warning=F}
+library(tinytex)
+```
+```{r webshot, message=F, warning=F}
+# install.packages("webshot")
+# webshot::install_phantomjs()
+```
+
+
+
+***
+
