@@ -1,0 +1,1397 @@
+---
+title: "COVID_19_Guide"
+author: "Yusuf Kemal Demir; Ph.D."
+date: "12/13/2020"
+output:
+  html_document:
+    theme: united
+    toc: yes
+    toc_depth: 2
+  word_document:
+    toc: yes
+    toc_depth: '2'
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###### Updated: 12/12/2020 Corresponding: phdykd@gmail.com, ydemir@uncc.edu
+
+### Install packages
+
+Install the `tidyverse`,`scales`,`ggspatial`,`sf` packages
+
+```{r install packages, message=F, warning=F}
+# install.packages('tidyverse')
+# install.packages('scales')
+# install.packages('ggspatial')
+# install.packages('sf')
+# install.packages("readr")
+# install.packages('viridis')
+# install.packages("plotly")
+# install.packages('tmap')
+# install.packages("tidyr") 
+# install.packages('dplyr')
+# install.packages('hrbrthemes')
+# install.packages(c("ggplot2", "devtools", "dplyr", "stringr"))
+# install.packages('rgdal')
+# install.packages(c("maps", "mapdata"))
+# install.packages("rworldmap")
+# install.packages('rgeos')
+# install.packages('rshape2')
+# remotes::install_github("wilkelab/cowplot")
+# install.packages("colorspace", repos = "http://R-Forge.R-project.org")
+# remotes::install_github("clauswilke/colorblindr")
+# install.packages('ggrepel')
+# install.packages('tictoc')
+# install.packages('pryr')
+# install.packages('gganimate')
+# install.packages('magick')
+# install.packages('janitor')
+# install.packages('shinyjs')
+# install.packages('treemap')
+# install.packages("processx")
+# devtools::install_github("timelyportfolio/d3treeR")
+```
+
+### Load libraries 
+
+
+```{r load library, warning=F,message=F}
+library(scales)
+library(ggspatial)
+library(sf)
+library(readr)
+library(viridis)
+library(plotly)
+library(tmap)
+library(here)
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+library(hrbrthemes)
+library(ggplot2)
+library(ggmap)
+library(maps)
+library(mapdata)
+library(stringr)
+library(rgdal)
+library(lubridate)
+library(ggmap)
+library(maps)
+library(mapdata)
+library(rworldmap)
+library(rgeos)
+library(reshape2)
+library(colorspace)
+library(colorblindr)
+library(cowplot)
+library(ggrepel)
+library(tictoc)
+library(pryr)
+library(sf)
+library(maps)
+library(gganimate)
+library(magick)
+library(janitor)
+library(shinyjs)
+library(treemap)
+library(d3treeR)
+```
+
+
+
+### US Confirmed Cases
+
+
+```{r confirmed usa, warning=F,message=F}
+cf<-read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv", stringsAsFactors = FALSE) 
+```
+
+```{r 49 states filter, message=FALSE, warning=FALSE}
+cf1<-filter(cf, Province_State != 'Alaska' & Province_State != 'American Samoa' & Province_State != 'Diamond Princess' & Province_State != 'Grand Princess' & Province_State !='Guam' & Province_State !='Hawaii' & Province_State !='Northern Mariana Islands' & Province_State !='Puerto Rico' & Province_State !='Virgin Islands')
+```
+
+
+```{r 49 states, message=FALSE, warning=FALSE}
+cf1<-as.data.frame(cf1)
+
+names(cf1)[names(cf1) == "X12.12.20"] <- "Confirmed"
+names(cf1)[names(cf1) == "Province_State"] <- "State"
+
+cf1<-subset(cf1, select = c(State,Confirmed))
+
+cf1$State = tolower(cf1$State)
+
+cf2<-cf1%>%
+group_by(State)
+
+```
+
+
+
+```{r last date, message=FALSE, warning=FALSE}
+rev(cf2)[1]
+```
+
+
+```{r last date sum, message=FALSE, warning=FALSE}
+cf2 %>%
+  summarise(Confirmed = sum(Confirmed))
+```
+
+
+```{r Confirmed, message=FALSE, warning=FALSE}
+
+cf2$State<-reorder(cf2$State,-cf2$Confirmed)
+
+ks <- function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000,
+                                   suffix = "k",
+                                   big.mark = ",")(x)}
+
+ggplot(cf2,aes(x = State, y = Confirmed,fill=State))+
+  geom_bar(stat='identity',width=0.7)+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "none")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  ggtitle("COVID-19") +
+  scale_y_continuous(labels = ks)
+
+```
+
+
+```{r cf2 join us state map, message=FALSE, warning=FALSE}
+us <- st_as_sf(maps::map(database = "state",plot=F,fill=T))
+
+```
+
+```{r}
+class(cf2)
+```
+```{r cf3, message=FALSE, warning=FALSE}
+cf3<-cf2 %>%
+  summarise(Confirmed = sum(Confirmed))
+```
+
+``` {r sf_cf3, message=FALSE, warning=FALSE}
+sf_cf3<-
+  us %>% 
+  full_join(cf3, by = c("ID" = "State"))
+```
+
+
+
+```{r plotly us confirm case, message=FALSE, warning=FALSE}
+plotly_confirm<-ggplot(sf_cf3)+
+  geom_sf(aes(fill=Confirmed,label=ID))+
+    scale_fill_viridis(labels=function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000,
+                                   suffix = "k",
+                                   big.mark = ",")(x)})+ labs(title="COVID-19")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        rect = element_blank())
+
+us_confirm<-ggplotly(plotly_confirm)
+us_confirm
+
+```
+
+
+```{r tmap confirm, message=FALSE, warning=FALSE}
+
+t_confirm<-tm_shape(sf_cf3)+
+  tm_polygons('Confirmed',id='ID', palette='YlGnBu', legend.hist = FALSE, legend.show=FALSE) +
+  tm_bubbles("Confirmed", "red", border.col = "black", border.lwd=1, 
+             size.lim = c(0, 3e6), sizes.legend = c(1e4, 3e5, 5e5, 8e5, 1e6, 2e6),
+             title.size="Confirmed")+
+tm_text("ID", size="Confirmed", scale=1, root=5, size.lowerbound = .3, 
+        bg.color="white", bg.alpha = .01, 
+        auto.placement = 1, legend.size.show = FALSE) 
+t_confirm
+
+```
+
+### US Death Cases
+
+```{r deaths usa, warning=F,message=F}
+dt<- read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv", stringsAsFactors = FALSE) 
+```
+
+```{r dt 49 states filter, message=FALSE, warning=FALSE}
+dt1<-filter(dt, Province_State != 'Alaska' & Province_State != 'American Samoa' & Province_State != 'Diamond Princess' & Province_State != 'Grand Princess' & Province_State !='Guam' & Province_State !='Hawaii' & Province_State !='Northern Mariana Islands' & Province_State !='Puerto Rico' & Province_State !='Virgin Islands')
+```
+
+
+```{r dt 49 states, message=FALSE, warning=FALSE}
+dt1<-as.data.frame(dt1)
+
+names(dt1)[names(dt1) == "X12.12.20"] <- "Death"
+names(dt1)[names(dt1) == "Province_State"] <- "State"
+
+dt1<-subset(dt1, select = c(State,Death))
+
+dt1$State = tolower(dt1$State)
+
+dt2<-dt1%>%
+group_by(State)
+
+```
+
+
+
+```{r last date death, message=FALSE, warning=FALSE}
+rev(dt2)[1]
+```
+
+
+```{r last date sum death, message=FALSE, warning=FALSE}
+dt2 %>%
+  summarise(Death = sum(Death))
+```
+
+
+```{r death, message=FALSE, warning=FALSE}
+
+dt2$State<-reorder(dt2$State,-dt2$Death)
+
+ks <- function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000,
+                                   suffix = "k",
+                                   big.mark = ",")(x)}
+
+ggplot(dt2,aes(x = State, y = Death,fill=State))+
+  geom_bar(stat='identity',width=0.7)+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "none")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  ggtitle("COVID-19") +
+  scale_y_continuous(labels = ks)
+
+```
+
+
+```{r dt2 join us state map, message=FALSE, warning=FALSE}
+us <- st_as_sf(maps::map(database = "state",plot=F,fill=T))
+
+```
+
+```{r class dt2, message=FALSE, warning=FALSE}
+class(dt2)
+```
+
+```{r dt3, message=FALSE, warning=FALSE}
+dt3<-dt2 %>%
+  summarise(Death = sum(Death))
+```
+
+``` {r sf_dt3, message=FALSE, warning=FALSE}
+sf_dt3<-
+  us %>% 
+  full_join(dt3, by = c("ID" = "State"))
+```
+
+```{r plotly us death case, message=FALSE, warning=FALSE }
+plotly_death<-ggplot(sf_dt3)+
+  geom_sf(aes(fill=Death,label=ID))+
+  scale_fill_viridis(labels=function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000,
+                                   suffix = "k",
+                                   big.mark = ",")(x)})+labs(title="COVID-19")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        rect = element_blank())
+  
+us_death<-ggplotly(plotly_death)
+us_death
+
+```
+
+```{r tmap us death, message=FALSE, warning=FALSE}
+
+t_death<-tm_shape(sf_dt3)+
+  tm_polygons('Death',id='ID', palette='YlGnBu', legend.hist = FALSE, legend.show=FALSE) +
+  tm_bubbles("Death", "red", border.col = "black", border.lwd=1, 
+             size.lim = c(0, 40e3), sizes.legend = c(5e3, 10e3, 15e3, 20e3, 25e3, 30e3),
+             title.size="Death")+
+tm_text("ID", size="Death", scale=1, root=5, size.lowerbound = .3, 
+        bg.color="white", bg.alpha = .01, 
+        auto.placement = 1, legend.size.show = FALSE) 
+t_death
+
+```
+
+
+
+
+
+```{r cf2 dt2 left join, message=FALSE, warning=FALSE}
+
+jus<-left_join(cf3, dt3, by='State')
+```
+
+
+
+### Global confirmed cases
+
+
+```{r confirmed global, warning=F,message=F}
+cw<-read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv", stringsAsFactors = FALSE)%>%
+  dplyr::mutate(Country.Region = ifelse(Country.Region == "North Macedonia", "Macedonia", Country.Region),
+                Country.Region = ifelse(Country.Region == "Taiwan*", "Taiwan", Country.Region),
+                Country.Region = ifelse(Country.Region == "US", "United States of America", Country.Region),
+                Country.Region = ifelse(Country.Region == "Korea, South", "South Korea", Country.Region),
+                Country.Region = ifelse(Country.Region == "Serbia", "Republic of Serbia", Country.Region),
+                Country.Region = ifelse(Country.Region == "Czechia", "Czech Republic", Country.Region),
+                Country.Region = ifelse(Country.Region == "West Bank and Gaza", "West Bank", Country.Region),
+                Country.Region = ifelse(Country.Region == "Congo (Brazzaville)", "Republic of the Congo",
+                                        Country.Region),
+                Country.Region = ifelse(Country.Region == "Congo (Kinshasa)", "Democratic Republic of the Congo",
+                                        Country.Region),
+                Country.Region = ifelse(Country.Region == "Cote d'Ivoire", "Cote dIvoire", Country.Region),
+                Country.Region = trimws( Country.Region))
+```
+
+
+
+```{r filter countries, message=FALSE, warning=FALSE}
+cw<-filter(cw, Country.Region != 'Bahamas' & Country.Region != 'Burma' & Country.Region != 'Cabo Verde' & Country.Region != 'Cote dIvoire' & Country.Region != 'Diamond Princess' & Country.Region != 'Eswatini' & Country.Region != 'Guinea-Bissau' & Country.Region != 'Holy See' & Country.Region != 'MS Zaandam' & Country.Region != 'Timor-Leste')
+```
+
+
+```{r global, message=FALSE, warning=FALSE}
+
+cw1<-as.data.frame(cw)
+
+names(cw1)[names(cw1) == "X12.12.20"] <- "Confirmed"
+names(cw1)[names(cw1) == "Country.Region"] <- "Country"
+
+cw1<-subset(cw1, select = c(Country,Confirmed))
+
+cw2<-cw1%>%
+group_by(Country)
+
+```
+
+
+
+```{r cw3, message=FALSE, warning=FALSE}
+cw3<- cw2 %>%
+  dplyr::summarise(total = sum(Confirmed), .groups = "drop")
+cw3
+```
+
+
+```{r last date sum cw3, message=FALSE, warning=FALSE}
+names(cw3)[names(cw3) == "total"] <- "Confirmed"
+
+cw4<-cw3 %>%
+  group_by(Country)%>%
+  summarise(Confirmed = sum(Confirmed))
+  
+```
+
+
+
+```{r global high risk countries confirmed over 100K, message=FALSE, warning=FALSE}
+cw5<-filter(cw4, Confirmed >= 200000)
+
+cw5$Country<-reorder(cw5$Country,-cw5$Confirmed)
+
+ks <- function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000000,
+                                   suffix = "M",
+                                   big.mark = ",")(x)}
+
+ggplot(cw5,aes(x = Country, y = Confirmed,fill=Country))+
+  geom_bar(stat='identity',width=0.7)+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "none")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  ggtitle("COVID-19 High, Case>0.2M") +
+  scale_y_continuous(labels = ks)
+
+```
+
+```{r global low risk  countries Confirmed lower 5K, message=FALSE, warning=FALSE}
+cw6<-filter(cw4, Confirmed <= 5000)
+
+cw6$Country<-reorder(cw6$Country,-cw6$Confirmed)
+
+ks <- function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000,
+                                   suffix = "k",
+                                   big.mark = ",")(x)}
+
+ggplot(cw6,aes(x = Country, y = Confirmed,fill=Country))+
+  geom_bar(stat='identity',width=0.7)+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "none")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+  
+  ggtitle("COVID-19 Low, Case<5k") +
+  scale_y_continuous(labels = ks)
+
+```
+
+
+
+
+```{r sf world map, message=FALSE, warning=FALSE}
+sf_world <- 
+  st_as_sf(rworldmap::getMap(resolution = "low"))%>%
+  st_transform(crs = 4326) %>% 
+  dplyr::select(GEOUNIT)
+```
+
+
+```{r cw4 and sf_world left join, message=FALSE, warning=FALSE}
+
+names(sf_world)[names(sf_world) == "GEOUNIT"] <- "Country"
+
+```
+
+
+``` {r sf_cw4, message=FALSE, warning=FALSE}
+sf_cw4<-
+  sf_world %>% 
+  full_join(cw4, by = c("Country" = "Country"))%>%
+  na.omit()
+```
+
+
+
+
+```{r plotly global confirm, message=FALSE, warning=FALSE}
+
+plotly_global_confirm<-ggplot(sf_cw4)+
+  geom_sf(aes(fill=Confirmed,label=Country))+
+  scale_fill_viridis(labels=function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000000,
+                                   suffix = "M",
+                                   big.mark = ",")(x)})+labs(title="COVID-19")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        rect = element_blank())
+```
+
+```{r plotly global confirm represent, message=FALSE, warning=FALSE}
+  
+global_confirm<-ggplotly(plotly_global_confirm)
+global_confirm
+```
+
+
+
+```{r tmap global confirm, message=FALSE, warning=FALSE}
+
+t_global_confirm<-tm_shape(sf_cw4)+
+  tm_polygons('Confirmed',id='Country', palette='YlGnBu', legend.hist = FALSE, legend.show=FALSE) +
+  tm_bubbles("Confirmed", "red", border.col = "black", border.lwd=1, scale=1,
+             size.lim = c(0, 12e6), sizes.legend = c(1e5, 5e6, 10e6),
+             title.size="Confirmed")+
+tm_text("Country", size="Confirmed", scale=1, root=5, size.lowerbound = .3, 
+        bg.color="white", bg.alpha = .01, 
+        auto.placement = 1, legend.size.show = FALSE) 
+t_global_confirm
+
+```
+
+
+
+
+### Global Death Cases
+
+```{r death global, warning=F,message=F}
+dw<-read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv", stringsAsFactors = FALSE)%>%
+  dplyr::mutate(Country.Region = ifelse(Country.Region == "North Macedonia", "Macedonia", Country.Region),
+                Country.Region = ifelse(Country.Region == "Taiwan*", "Taiwan", Country.Region),
+                Country.Region = ifelse(Country.Region == "US", "United States of America", Country.Region),
+                Country.Region = ifelse(Country.Region == "Korea, South", "South Korea", Country.Region),
+                Country.Region = ifelse(Country.Region == "Serbia", "Republic of Serbia", Country.Region),
+                Country.Region = ifelse(Country.Region == "Czechia", "Czech Republic", Country.Region),
+                Country.Region = ifelse(Country.Region == "West Bank and Gaza", "West Bank", Country.Region),
+                Country.Region = ifelse(Country.Region == "Congo (Brazzaville)", "Republic of the Congo",
+                                        Country.Region),
+                Country.Region = ifelse(Country.Region == "Congo (Kinshasa)", "Democratic Republic of the Congo",
+                                        Country.Region),
+                Country.Region = ifelse(Country.Region == "Cote d'Ivoire", "Cote dIvoire", Country.Region),
+                Country.Region = trimws( Country.Region))
+```
+
+
+
+```{r filter countries death global, message=FALSE, warning=FALSE}
+dw<-filter(dw, Country.Region != 'Bahamas' & Country.Region != 'Burma' & Country.Region != 'Cabo Verde' & Country.Region != 'Cote dIvoire' & Country.Region != 'Diamond Princess' & Country.Region != 'Eswatini' & Country.Region != 'Guinea-Bissau' & Country.Region != 'Holy See' & Country.Region != 'MS Zaandam' & Country.Region != 'Timor-Leste')
+```
+
+
+```{r death global dw1, message=FALSE, warning=FALSE}
+
+dw1<-as.data.frame(dw)
+
+names(dw1)[names(dw1) == "X12.12.20"] <- "Death"
+names(dw1)[names(dw1) == "Country.Region"] <- "Country"
+
+dw1<-subset(dw1, select = c(Country,Death))
+
+dw2<-dw1%>%
+group_by(Country)
+
+```
+
+
+
+```{r dw3, message=FALSE, warning=FALSE}
+dw3<- dw2 %>%
+  dplyr::summarise(total = sum(Death), .groups = "drop")
+dw3
+```
+
+
+```{r last date sum dw4 dw3, message=FALSE, warning=FALSE}
+names(dw3)[names(dw3) == "total"] <- "Death"
+
+dw4<-dw3 %>%
+  group_by(Country)%>%
+  summarise(Death = sum(Death))
+  
+```
+
+
+
+```{r global high risk countries death over 2500, message=FALSE, warning=FALSE}
+dw5<-filter(dw4, Death >= 2500)
+
+dw5$Country<-reorder(dw5$Country,-dw5$Death)
+
+ks <- function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000,
+                                   suffix = "k",
+                                   big.mark = ",")(x)}
+
+ggplot(dw5,aes(x = Country, y = Death,fill=Country))+
+  geom_bar(stat='identity',width=0.7)+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "none")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+    ggtitle("COVID-19 High, Case>2.5k") +
+  scale_y_continuous(labels = ks)
+
+```
+
+
+
+```{r global low risk  countries death lower 100, message=FALSE, warning=FALSE}
+dw6<-filter(dw4, Death <= 100)
+
+dw6$Country<-reorder(dw6$Country,-dw6$Death)
+
+
+ggplot(dw6,aes(x = Country, y = Death,fill=Country))+
+  geom_bar(stat='identity',width=0.7)+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "none")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  ggtitle("COVID-19 Low, Case<100")
+
+```
+
+
+
+
+``` {r sf_dw4, message=FALSE, warning=FALSE}
+sf_dw4<-
+  sf_world %>% 
+  full_join(dw4, by = c("Country" = "Country"))%>%
+  na.omit()
+```
+
+
+
+
+
+
+
+```{r plotly global confirm dw4, message=FALSE, warning=FALSE }
+
+plotly_global_death<-ggplot(sf_dw4)+
+  geom_sf(aes(fill=Death,label=Country))+
+    scale_fill_viridis(labels=function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000,
+                                   suffix = "k",
+                                   big.mark = ",")(x)})+labs(title="COVID-19")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        rect = element_blank())
+  
+global_death<-ggplotly(plotly_global_death)
+global_death
+
+```
+
+
+
+```{r tmap global death, message=FALSE, warning=FALSE}
+
+t_global_death<-tm_shape(sf_dw4)+
+  tm_polygons('Death',id='Country', palette='YlGnBu', legend.hist = FALSE, legend.show=FALSE) +
+  tm_bubbles("Death", "red", border.col = "black", border.lwd=1, scale=1,
+             size.lim = c(0, 40e3), sizes.legend = c(10e3, 15e3, 20e3, 25e3, 30e3),
+             title.size="Death")+
+tm_text("Country", size="Death", scale=1, root=3, size.lowerbound = .3, 
+        bg.color="white", bg.alpha = .01, 
+        auto.placement = 1, legend.size.show = FALSE) 
+t_global_death
+
+```
+
+### Global Recovered Cases
+
+
+```{r recovered global, warning=F,message=F}
+rw<-read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_recovered_global.csv", stringsAsFactors = FALSE)%>%
+  dplyr::mutate(Country.Region = ifelse(Country.Region == "North Macedonia", "Macedonia", Country.Region),
+                Country.Region = ifelse(Country.Region == "Taiwan*", "Taiwan", Country.Region),
+                Country.Region = ifelse(Country.Region == "US", "United States of America", Country.Region),
+                Country.Region = ifelse(Country.Region == "Korea, South", "South Korea", Country.Region),
+                Country.Region = ifelse(Country.Region == "Serbia", "Republic of Serbia", Country.Region),
+                Country.Region = ifelse(Country.Region == "Czechia", "Czech Republic", Country.Region),
+                Country.Region = ifelse(Country.Region == "West Bank and Gaza", "West Bank", Country.Region),
+                Country.Region = ifelse(Country.Region == "Congo (Brazzaville)", "Republic of the Congo",
+                                        Country.Region),
+                Country.Region = ifelse(Country.Region == "Congo (Kinshasa)", "Democratic Republic of the Congo",
+                                        Country.Region),
+                Country.Region = ifelse(Country.Region == "Cote d'Ivoire", "Cote dIvoire", Country.Region),
+                Country.Region = trimws( Country.Region))
+```
+
+
+
+```{r filter countries recovered global, message=FALSE, warning=FALSE}
+rw<-filter(rw, Country.Region != 'Bahamas' & Country.Region != 'Burma' & Country.Region != 'Cabo Verde' & Country.Region != 'Cote dIvoire' & Country.Region != 'Diamond Princess' & Country.Region != 'Eswatini' & Country.Region != 'Guinea-Bissau' & Country.Region != 'Holy See' & Country.Region != 'MS Zaandam' & Country.Region != 'Timor-Leste')
+```
+
+
+```{r recovered global rw1, message=FALSE, warning=FALSE}
+
+rw1<-as.data.frame(rw)
+
+names(rw1)[names(rw1) == "X12.12.20"] <- "Recovered"
+names(rw1)[names(rw1) == "Country.Region"] <- "Country"
+
+rw1<-subset(rw1, select = c(Country,Recovered))
+
+rw2<-rw1%>%
+group_by(Country)
+
+```
+
+
+
+```{r rw3, message=FALSE, warning=FALSE}
+rw3<- rw2 %>%
+  dplyr::summarise(total = sum(Recovered), .groups = "drop")
+rw3
+```
+
+
+```{r last date sum dw3, message=FALSE, warning=FALSE}
+names(rw3)[names(rw3) == "total"] <- "Recovered"
+
+rw4<-rw3 %>%
+  group_by(Country)%>%
+  summarise(Recovered = sum(Recovered))
+  
+```
+
+
+```{r cw4 dw4 rw4 left join, message=FALSE, warning=FALSE}
+
+jw<-left_join(cw4, dw4, by='Country') %>%
+                left_join(rw4, by='Country') 
+
+```
+
+```{r global jw, message=FALSE, warning=FALSE}
+jw$Country<-reorder(jw$Country,-jw$Confirmed)
+jw1<-filter(jw, Confirmed >= 1000000)
+
+ks <- function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000000,
+                                   suffix = "M",
+                                   big.mark = ",")(x)}
+
+ggplot(jw1)+
+geom_bar(aes(x = Country, y = Confirmed,colour="gray"),stat='identity',width=0.7)+
+  geom_line(aes(x=Country,y=Recovered),stat='identity',colour='red',size=1,group=1)+
+  geom_point(aes(x=Country,y=Recovered))+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "none")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  ggtitle("COVID-19 Confirmed vs Recovered, Confirmed Case>1M") +
+  scale_y_continuous(labels = ks, sec.axis = sec_axis(~./1000000,name = "Recovered/Million"))
+
+
+```
+
+
+```{r stacked bar jw, message=FALSE, warning=FALSE}
+stacked_bar <- plot_ly(jw, x = ~Country, y = ~Confirmed, type = 'bar', name = 'Confirmed') %>%
+  add_trace(y = ~Death, name = 'Death') %>% 
+  add_trace(y = ~Recovered, name = 'Recovered') %>% 
+  layout(yaxis = list(title = 'Count'), barmode = 'stack')
+
+stacked_bar
+```
+
+
+
+```{r global low recovered less than 2500, message=FALSE, warning=FALSE}
+rw5<-filter(rw4, Recovered <= 2500)
+
+rw5$Country<-reorder(rw5$Country,-rw5$Recovered)
+
+
+
+ggplot(rw5,aes(x = Country, y = Recovered,fill=Country))+
+  geom_bar(stat='identity',width=0.7)+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "none")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+    ggtitle("COVID-19 Low, Case<2.5k")
+
+```
+
+```{r global high recovered more than 100000, message=FALSE, warning=FALSE}
+rw6<-filter(rw4, Recovered >= 100000)
+
+rw6$Country<-reorder(rw6$Country,-rw6$Recovered)
+
+ks <- function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000000,
+                                   suffix = "M",
+                                   big.mark = ",")(x)}
+
+ggplot(rw6,aes(x = Country, y = Recovered,fill=Country))+
+  geom_bar(stat='identity',width=0.7)+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+
+  theme(legend.position = "none")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  ggtitle("COVID-19 High,Case>0.1M") +
+  scale_y_continuous(labels = ks)
+
+```
+
+
+
+
+``` {r sf_rw4, message=FALSE, warning=FALSE}
+sf_rw4<-
+  sf_world %>% 
+  full_join(rw4, by = c("Country" = "Country"))%>%
+  na.omit()
+```
+
+
+
+
+```{r plotly global recovered, message=FALSE, warning=FALSE }
+
+plotly_global_recovered<-ggplot(sf_rw4)+
+  geom_sf(aes(fill=Recovered,label=Country))+
+  scale_fill_viridis(labels=function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000000,
+                                   suffix = "M",
+                                   big.mark = ",")(x)})+labs(title="COVID-19")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        rect = element_blank())
+  
+global_recovered<-ggplotly(plotly_global_recovered)
+global_recovered
+
+```
+
+
+
+```{r tmap global recovered, message=FALSE, warning=FALSE}
+
+t_global_recovered<-tm_shape(sf_rw4)+
+  tm_polygons('Recovered',id='Country', palette='YlGnBu', legend.hist = FALSE, legend.show=FALSE) +
+  tm_bubbles("Recovered", "red", border.col = "black", border.lwd=1, 
+             size.lim = c(0, 15e6), sizes.legend = c(5e5, 5e6, 10e6),
+             title.size="Recovered")+
+tm_text("Country", size="Recovered", scale=1, root=3, size.lowerbound = .3, 
+        bg.color="white", bg.alpha = .01, 
+        auto.placement = 1, legend.size.show = FALSE) 
+t_global_recovered
+
+```
+
+
+
+
+
+### Tree Confirm Distribution 
+
+
+```{r us confirmed treemap, message=FALSE, warning=FALSE}
+
+cc_us <- treemap(cf3, index="State",vSize="Confirmed" ,vColor="State",border.col=c("black","white"), palette = "RdYlBu", title="Confirmed",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+
+
+```{r us confirmed treemap interactive, message=FALSE, warning=FALSE}
+
+cc_us1<-d3tree2(cc_us,rootname = "US Confirmed COVID-19")
+cc_us1
+
+```
+
+
+```{r us death treemap, message=FALSE, warning=FALSE}
+
+dc_us <- treemap(dt3, index="State",vSize="Death" ,vColor="State",border.col=c("black","white"), palette = "RdPu", title="Death",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+
+
+```{r us death treemap interactive, message=FALSE, warning=FALSE}
+
+dc_us1<-d3tree2(dc_us,rootname = "US Death COVID-19")
+dc_us1
+
+```
+
+```{r global confirmed treemap, message=FALSE, warning=FALSE}
+
+cc_global <- treemap(cw4, index="Country",vSize="Confirmed" ,vColor="Country",border.col=c("black","white"), palette = "RdYlBu", title="Confirmed",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+
+
+```{r global recovered treemap interactive, message=FALSE, warning=FALSE}
+
+cc_global1<-d3tree2(cc_global, rootname = "Confirmed COVID-19")
+cc_global1
+
+```
+
+
+
+
+
+```{r high global confirmed treemap, message=FALSE, warning=FALSE}
+
+cc_global2 <- treemap(cw5, index="Country",vSize="Confirmed" ,vColor="Country",border.col=c("black","white"), palette = "RdYlBu", title="High Confirmed, Case>0.2M",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+
+
+```{r high global confirmed treemap interactive, message=FALSE, warning=FALSE}
+
+cc_global3<-d3tree2(cc_global2, rootname = "High Confirmed COVID-19, Case>0.2M")
+cc_global3
+
+```
+
+
+
+```{r low global confirmed treemap, message=FALSE, warning=FALSE}
+
+cc_global4 <- treemap(cw6, index="Country",vSize="Confirmed" ,vColor="Country",border.col=c("black","white"), palette = "RdYlBu", title="Low Confirmed,Case<5k",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+
+
+```{r low global confirmed treemap interactive, message=FALSE, warning=FALSE}
+
+cc_global5<-d3tree2(cc_global4, rootname = "Low Confirmed COVID-19, Case<5k")
+cc_global5
+
+```
+
+
+
+
+```{r global death treemap, message=FALSE, warning=FALSE}
+
+dc_global <- treemap(dw4, index="Country",vSize="Death" ,vColor="Country",border.col=c("black","white"), palette = "RdPu", title="Death",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+
+
+```{r global death treemap interactive, message=FALSE, warning=FALSE}
+
+dc_global1<-d3tree2(dc_global,rootname = "Death COVID-19")
+dc_global1
+
+```
+
+
+```{r global high death treemap, message=FALSE, warning=FALSE}
+
+dc_global2 <- treemap(dw5, index="Country",vSize="Death" ,vColor="Country",border.col=c("black","white"), palette = "RdPu", title="High Death, Case>2.5k",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+
+
+```{r global high death treemap interactive, message=FALSE, warning=FALSE}
+
+dc_global3<-d3tree2(dc_global2,rootname = "High Death COVID-19,Case>2.5k")
+dc_global3
+
+```
+
+
+```{r global low death treemap, message=FALSE, warning=FALSE}
+
+dc_global4 <- treemap(dw6, index="Country",vSize="Death" ,vColor="Country",border.col=c("black","white"), palette = "RdPu", title="Low Death,Case<100",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+
+
+```{r global low death treemap interactive, message=FALSE, warning=FALSE}
+
+dc_global5<-d3tree2(dc_global4,rootname = "Low Death COVID-19,Case<100")
+dc_global5
+
+```
+
+
+
+
+```{r global recovered treemap, message=FALSE, warning=FALSE}
+
+rc_global <- treemap(rw4, index="Country",vSize="Recovered" ,vColor="State",border.col=c("black","white"), palette = "Greens", title="Recovered",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+
+
+```{r global1 recovered treemap interactive, message=FALSE, warning=FALSE}
+
+rc_global1<-d3tree2(rc_global, rootname = "Recovered COVID-19")
+rc_global1
+
+```
+
+```{r global high recovered treemap, message=FALSE, warning=FALSE}
+
+rc_global2 <- treemap(rw6, index="Country",vSize="Recovered" ,vColor="State",border.col=c("black","white"), palette = "Greens", title="High Recovered,Case>0.1M",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+```{r global high recovered treemap interactive, message=FALSE, warning=FALSE}
+
+rc_global3<-d3tree2(rc_global2, rootname = "High Recovered COVID-19,Case>0.1M")
+rc_global3
+
+```
+
+
+
+```{r global low recovered treemap, message=FALSE, warning=FALSE}
+
+rc_global4 <- treemap(rw5, index="Country",vSize="Recovered" ,vColor="State",border.col=c("black","white"), palette = "Greens", title="Low Recovered,Case<2.5k",
+fontsize.title=16, fontsize.labels = 8)
+
+```
+
+```{r global low recovered treemap interactive, message=FALSE, warning=FALSE}
+
+rc_global5<-d3tree2(rc_global4, rootname = " Low Recovered COVID-19,Case<2.5k")
+rc_global5
+
+```
+
+### Recovered to Death Ratio World
+
+
+```{r Death to Recovered Ratio World, message=FALSE, warning=FALSE}
+
+jw$Recovered_Death_Ratio<-jw$Recovered/jw$Death
+
+
+```
+
+
+
+``` {r sf_rdr Recovered_Death_Ratio, message=FALSE, warning=FALSE}
+sf_rdr<-
+  sf_world %>% 
+  full_join(jw, by = c("Country" = "Country"))%>%
+  na.omit()
+```
+
+
+
+
+
+```{r plotly global sf_rdr Recovered_Death_Ratio, message=FALSE, warning=FALSE}
+
+rdr<-ggplot(sf_rdr)+
+  geom_sf(aes(fill=Recovered_Death_Ratio,label=Country))+
+    scale_fill_viridis(labels=function (x) { number_format(accuracy = 1,
+                                   scale = 1*100,
+                                   big.mark = ",")(x)})+labs(title="COVID-19 Recovered/Death")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        rect = element_blank())
+  
+plotly_rdr<-ggplotly(rdr)
+plotly_rdr
+
+```
+
+
+### Recovered to Confirmed Ratio World
+
+
+
+```{r Recovered to Confirmed Ratio World, message=FALSE, warning=FALSE}
+
+jw$Recovered_Confirmed_Ratio<-jw$Recovered/jw$Confirmed
+
+
+```
+
+
+
+``` {r sf_rcr Recovered_Death_Ratio, message=FALSE, warning=FALSE}
+sf_rcr<-
+  sf_world %>% 
+  full_join(jw, by = c("Country" = "Country"))%>%
+  na.omit()
+```
+
+
+
+
+
+```{r plotly global sf_rdr Recovered_Confirmed_Ratio, message=FALSE, warning=FALSE}
+
+rcr<-ggplot(sf_rcr)+
+  geom_sf(aes(fill=Recovered_Confirmed_Ratio,label=Country))+
+    scale_fill_viridis(labels=function (x) { number_format(accuracy = 1,
+                                                           scale = 1*100,
+                                   big.mark = ",")(x)})+labs(title="COVID-19 Recovered/Confirmed Percent")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        rect = element_blank())
+  
+plotly_rcr<-ggplotly(rcr)
+plotly_rcr
+
+```
+
+```{r tmap global sf_rdr Recovered_Death_Ratio, message=FALSE, warning=FALSE}
+
+t_global_rdr<-tm_shape(sf_rdr)+
+  tm_polygons('Confirmed',id='Country', palette='YlGnBu', legend.hist = FALSE, legend.show=TRUE) +
+  tm_bubbles("Recovered_Death_Ratio", "red", border.col = "black", border.lwd=1, 
+             size.lim = c(0, 1e5), sizes.legend = c(10,100,1e3,1e5),
+             title.size="Recovered_Death_Ratio")+
+tm_text("Country", size="Recovered_Death_Ratio", scale=1, root=1, size.lowerbound = .3, 
+        bg.color="white", bg.alpha = .01, 
+        auto.placement = 1, legend.size.show = FALSE)+
+tm_legend(outside=TRUE)+
+  tm_layout(legend.text.size =0.7,
+            legend.title.size = 0.7,
+            legend.width =2)
+t_global_rdr
+
+```
+
+### Death to Confirmed Ratio World
+
+
+
+```{r Death to Confirmed Ratio World, message=FALSE, warning=FALSE}
+
+jw$Death_Confirmed_Ratio<-jw$Death/jw$Confirmed
+
+jw<-within(jw,Death_Confirmed_Ratio<-jw$Death/jw$Confirmed)
+
+```
+
+
+
+``` {r sf_dcc Death_Confirmed_Ratio, message=FALSE, warning=FALSE}
+sf_dcc<-
+  sf_world %>% 
+  full_join(jw, by = c("Country" = "Country"))%>%
+  na.omit()
+```
+
+
+
+
+
+```{r plotly global sf_dcc Death_Confirmed_Ratio, message=FALSE, warning=FALSE}
+
+dcc<-ggplot(sf_dcc)+
+  geom_sf(aes(fill=Death_Confirmed_Ratio,label=Country))+
+    scale_fill_viridis(labels=function (x) { number_format(accuracy = 1,
+                                                           scale = 1*100,
+                                   big.mark = ",")(x)})+labs(title="COVID-19 Death/Confirmed")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        rect = element_blank())
+  
+plotly_dcc<-ggplotly(dcc)
+plotly_dcc
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r tmap globaL_cd Confirmed Death text size Recovery, message=FALSE, warning=FALSE}
+
+t_global_cd<-tm_shape(sf_rdr)+
+  tm_polygons('Confirmed',id='Country', palette='YlGnBu', legend.hist = FALSE, legend.show=TRUE) +
+  tm_bubbles("Death", "red", border.col = "black", border.lwd=1,
+             size.lim = c(0, 4e5), sizes.legend = c(4e2,4e3,4e5),
+             title.size="Death")+
+tm_text("Country", size="Recovered", scale=1, root=1, size.lowerbound = .3, 
+        bg.color="white", bg.alpha = .01, 
+        auto.placement = 1, legend.size.show = FALSE)+
+tm_legend(outside=TRUE)+
+  tm_layout(legend.text.size =0.7,
+            legend.title.size = 0.7,
+            legend.width =2)
+t_global_cd
+
+```
+
+
+
+
+
+### Death to Confirmed Ratio US
+
+
+
+```{r Confirmed to Death Ratio US, message=FALSE, warning=FALSE}
+
+jus$Confirmed_Death_Ratio<-jus$Confirmed/jus$Death
+
+jus<-within(jus,Confirmed_Death_Ratio<-jus$Confirmed/jus$Death)
+
+```
+
+
+``` {r sf_jus, message=FALSE, warning=FALSE}
+sf_jus<-
+  us %>% 
+  full_join(jus, by = c("ID" = "State"))
+```
+
+
+
+
+
+```{r plotly global cdr_us Confirmed_Death_Ratio, message=FALSE, warning=FALSE}
+
+cdr_us<-ggplot(sf_jus)+
+  geom_sf(aes(fill=Confirmed_Death_Ratio,label=ID))+
+    scale_fill_viridis(labels=function (x) { number_format(accuracy = 1,
+                                                           scale = 1,
+                                   big.mark = ",")(x)})+labs(title="COVID-19 Confirmed/Death")+
+  theme(panel.background = element_rect(fill = "transparent",colour = NA),
+        panel.grid.minor = element_blank(), 
+        panel.grid.major = element_blank(),
+        plot.background = element_rect(fill = "transparent",colour = NA))+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks = element_blank(),
+        rect = element_blank())
+  
+plotly_cdr_us<-ggplotly(cdr_us)
+plotly_cdr_us
+
+```
+
+```{r tmap US Confirmed text and bubble size Death, message=FALSE, warning=FALSE}
+
+t_us_cd<-tm_shape(sf_jus)+
+  tm_polygons('Confirmed',id='ID', palette='YlGnBu', legend.hist = FALSE, legend.show=TRUE) +
+  tm_bubbles("Death", "red", border.col = "black", border.lwd=1,
+             size.lim = c(0, 4e4), sizes.legend = c(4e2,4e3,4e4),
+             title.size="Death")+
+tm_text("ID", size="Death", scale=1, root=4, size.lowerbound = .3, 
+        bg.color="white", bg.alpha = .01, 
+        auto.placement = 1, legend.size.show = FALSE)+
+tm_legend(outside=TRUE)+
+  tm_layout(legend.text.size =0.7,
+            legend.title.size = 0.7,
+            legend.width =2)
+t_us_cd
+
+```
+
+```{r tmap US Confirmed Death Ratio,death bubble size, text confirmed size, message=FALSE, warning=FALSE}
+
+t_us_cd_ratio<-tm_shape(sf_jus)+
+  tm_polygons('Confirmed_Death_Ratio',id='ID', palette='YlGnBu', legend.hist = FALSE, legend.show=TRUE) +
+  tm_bubbles("Death", "red", border.col = "black", border.lwd=1, 
+             size.lim = c(0, 4e4), sizes.legend = c(4e2,4e3,4e4),
+             title.size="Death")+
+tm_text("ID", size="Confirmed", scale=1, root=5, size.lowerbound = .3, 
+        bg.color="white", bg.alpha = .01, 
+        auto.placement = 1, legend.size.show = FALSE)+
+tm_legend(outside=TRUE)+
+  tm_layout(legend.text.size =0.7,
+            legend.title.size = 0.7,
+            legend.width =2)
+t_us_cd_ratio
+
+```
+
+
+### Reference
+
+
+# https://www.statsandr.com/blog/top-r-resources-on-covid-19-coronavirus/
+# https://ramikrispin.github.io/coronavirus_dashboard/
+# https://rpubs.com/rdwinkelman/covid19_us_spread_gif
+# https://github.com/CSSEGISandData/COVID-19
+# https://colorbrewer2.org/#type=sequential&scheme=RdPu&n=9
+# file:///C:/Users/admin/Desktop/UNCC/Fall%202020/Assignments/5122/Group_Assignment_1/DSBA_5122/DSBA_5122.html
+# https://www.r-bloggers.com/2019/01/using-custom-scales-with-the-scales-package/
+# https://stackoverflow.com/questions/56497958/ggplot-sf-package-how-make-simple-pie-graph-on-map
+# https://stackoverflow.com/questions/40980189/removing-latitude-and-longitude-labels-in-ggplot
+# https://rdrr.io/cran/tmap/man/tm_add_legend.html
+# https://geocompr.github.io/post/2019/tmap-color-scales/
+# https://mran.microsoft.com/snapshot/2016-08-05/web/packages/tmap/vignettes/tmap-nutshell.html
+# https://www.google.com/search?q=tm_format_us+in+r&rlz=1C1GCEU_enUS881US881&oq=tm_format_us+in+r&aqs=chrome..69i57j33i160.6419j0j7&sourcei# d=chrome&ie=UTF-8
+# https://github.com/r-spatial/sf/issues/385
+# https://www.r-spatial.org/r/2018/10/25/ggplot2-sf.html
+# https://plotly-r.com/maps.html
+# https://stackoverflow.com/questions/52413452/add-commas-to-colorbar-legend-in-geom-sf-r-ggplot
+# https://ggplot2.tidyverse.org/reference/scale_viridis.html
+# http://www.sthda.com/english/wiki/ggplot2-title-main-axis-and-legend-titles
+# https://www.r-graph-gallery.com/237-interactive-treemap.html
+# https://cran.r-project.org/web/packages/d3Tree/d3Tree.pdf
+# https://www.buildingwidgets.com/blog?offset=1438822649255
+# https://stackoverflow.com/questions/58859206/interactive-treemap-d3tree-in-rstudio-no-legend-when-savewidget-is-used
