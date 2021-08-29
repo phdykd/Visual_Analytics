@@ -1,0 +1,854 @@
+---
+title: "Malaria in Africa"
+author: "Yusuf Kemal Demir; Ph.D."
+date: "11/6/2020"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+  word_document:
+    toc:true
+    toc_depth:'2'
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Datasets
+
+Dataset1_malaria_death dataset was selected that has been visualized by Cédric Scherer Data by World Health Organization (WHO). Their codes can be accessed through the following link
+https://github.com/Z3tt/TidyTuesday/blob/master/R/2018_33_Malaria.Rmd
+
+This dataset1 provides information about the malaria_deaths per 100K people between 1990 and 2016.
+
+Dataset2_malariaAtlas dataset that provides parasite rate (prevalence) that caused Malaria between 1985 and 2017 (provided from R library)
+
+Dataset3_Incidence of malaria that is the number of new cases of malaria in a year per 1,000 population at risk between 2000 and 2015 (provided from https://ourworldindata.org/malaria)
+
+
+
+## Tidytuesday Visualization
+
+```{r pubs packages, message=F, warning=F}
+# install.packages('biscale')
+# install.packages('extrafont')
+# install.packages('rworldmap')
+# install.packages('rgeos')
+# install.packages('raster')
+# install.packages('here')
+# install.packages('tidyverse')
+# install.packages('sf')
+# install.packages(ggrepel)
+# remotes::install_github("wilkelab/cowplot")
+# install.packages("colorspace", repos = "http://R-Forge.R-project.org")
+# remotes::install_github("clauswilke/colorblindr")
+# install.packages('sf')
+# install.packages('tmap')
+# install.packages('ggridges')
+# devtools::install_github("ropensci/plotly")
+# install.packages('gganimate')
+# install.packages("av")
+# install.packages('malariaAtlas')
+```
+
+
+```{r prep library, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(colorspace)
+library(viridis)
+library(plotly)
+library(ggridges)
+library(sf)
+library(biscale)
+library(cowplot)
+library(colorblindr)
+library(sp)
+library(rworldmap)
+library(rgeos)
+library(raster)
+library(here)
+library(ggplot2)
+library(tmap)
+library(tmaptools)
+library(leaflet)
+library(dplyr)
+library(colorblindr)
+library(ggrepel)
+library(gganimate)
+library(av)
+library(malariaAtlas)
+options(scipen=999)
+library(extrafont)
+# extrafont::loadfonts()
+theme_set(theme_minimal())
+theme_update(
+  axis.ticks = element_blank(),
+  axis.text = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.background = element_rect(color = NA, 
+                                  fill = "white"),
+  plot.background = element_rect(color = "#806A8A", 
+                                 fill = "white",
+                                 size = 5),
+  plot.title = element_text(family = "Changa One", 
+                            color = "black",
+                            size = 44, 
+                            face = "bold",
+                            hjust = 0.5,
+                            margin = margin(t = 36, b = 6)),
+  plot.subtitle = element_text(family = "Changa One", 
+                               color = "#CABED0",
+                               size = 21, 
+                               hjust = 0.5,
+                               margin = margin(t = 6, b = 20)),
+  plot.caption = element_text(family = "Changa One", 
+                              color = "#806A8A", 
+                              size = 21, 
+                              face = "plain",
+                              hjust = 0.5,
+                              margin = margin(t = 0, b = 36)))
+
+
+```
+
+
+
+
+
+```{r data-prep1}
+df_malaria <- read.csv(file='data/malaria_deaths_tidytuesday.csv')
+```
+
+```{r data-prep2}
+sf_world <- 
+  st_as_sf(rworldmap::getMap(resolution = "low")) %>%
+  st_transform(crs = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs") %>% 
+  dplyr::select(ISO_A3, continent)
+sf_malaria <-
+  sf_world %>% 
+  full_join(df_malaria, by = c("ISO_A3" = "Code"))
+```
+
+
+
+
+```{r map1, fig.width = 18, fig.height = 11.9}
+sf_malaria_bi <-
+  sf_malaria %>% 
+  filter(
+    continent == "Africa",
+    !is.na(Year)
+  ) %>% 
+  group_by(ISO_A3) %>% 
+  summarize(
+    var = var(malaria_deaths, na.rm = T),
+    mean = mean(malaria_deaths, na.rm = T)
+  )  %>% 
+  bi_class(x = mean, y = var, style = "quantile", dim = 3)
+
+```
+
+
+```{r map2}
+bi_map <- 
+  ggplot(sf_malaria_bi) +
+    geom_sf(data = sf_world %>% filter(continent == "Africa"),
+            color = "grey20",
+            fill = "grey70",
+            lwd = 0.2) +
+    geom_sf(aes(fill = bi_class), 
+            color = "grey20",
+            lwd = 0.2) +
+    bi_scale_fill(pal = "DkViolet", dim = 3, guide = F) +
+    scale_x_continuous(expand = c(0.03, 0.03)) +
+    scale_y_continuous(expand = c(0.03, 0.03), limits = c(-4200000, NA)) +
+    labs(x = NULL, y = NULL,
+         title = "Malaria Death Rates between 1990 and 2016",
+         subtitle = "A bivariate map showing mean and variance of annual Malaria death rates in African countries",
+         caption = "Visualization by Cédric Scherer  •  Data by World Health Organization (WHO) ")
+legend <- 
+  bi_legend(pal = "DkViolet",
+            dim = 3,
+            xlab = "Mean ",
+            ylab = "Variance ") +
+  # bi_theme(base_family = "Changa One") +
+  theme(rect = element_rect(fill = "grey10"),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        axis.title.x = element_text(size = 21,
+                                    color = "#BC7C8F"),
+        axis.title.y = element_text(size = 21,
+                                    color = "#89A1C8"))
+```
+
+
+
+```{r map3}
+map_legend <- ggdraw() +
+  draw_plot(bi_map, 0, 0, 1, 1) +
+  draw_plot(legend, 0.15, 0.25, 0.2, 0.2)
+
+```
+
+
+
+```{r ggsave}
+
+ggsave(path="C:/Users/admin/Desktop/UNCC/Fall 2020/Assignments/5122/Group_Assignment_1/DSBA_5122",filename= "2018_33_MalariaDeaths.pdf",plot = map_legend, width = 15, height = 16.5, device = cairo_pdf)
+```
+
+
+***
+  
+```{r session-info}
+sessionInfo()
+```
+
+## This group's visualization
+
+For this project, you will find someone else’s submitted #TidyTuesday submission, critique it, then offer suggestions on ways to improve and enhance their work.
+
+
+## Goals:
+Become familar with TidyTuesday and the R Online Learning Community
+
+Learn through someone else’s submission on novel visualization techniques, how to provide code in open source (e.g., how people post code on GitHub, etc.), and how to provide constructive design feedback on existing designs.
+
+Improve and enhance others’ work by developing a task/scenario around the visualization and modifying the visualization for that task/scenario.
+
+Datasets/Submission:
+
+Choose any dataset from the #tidytuesday GitHub repository.
+
+These datasets are part of a weekly RStudio crowd-sourced project.
+
+Check out some of these projects using these datasets:
+
+TidyTuesday Podcast series
+
+Cedric Scherer’s Tidy Tuesday contributions
+
+Dr. Torsten Sprenger’s Tidy Tuesday contributions
+
+## Objective:
+
+### 1. Research and choose a TidyTuesday submission:
+Go onto Twitter and search #tidytuesday and find one (1) posting relating to your dataset that includes the code they used.
+
+### Answer 1
+
+1- Dataset1_Malaria dataset was selected that has been visualized by Cédric Scherer Data by World Health Organization (WHO). Their codes can be accessed through the following link
+https://github.com/Z3tt/TidyTuesday/blob/master/R/2018_33_Malaria.Rmd
+
+This dataset1 provides information about the malaria_deaths per 100K people between 1990 and 2016.
+
+2-Dataset2_malariaAtlas dataset that provides parasite rate (prevalence) that caused Malaria between 1985 and 2017 (provided from R library)
+
+3- Dataset3_Incidence of malaria that is the number of new cases of malaria in a year per 1,000 population at risk between 2000 and 2015 (provided from https://ourworldindata.org/malaria)
+
+
+### 2. Critique:
+
+Critique the design of that TidyTuesday submission.
+
+-What are good design aspects?
+
+-What are ways to improve this visualization?
+
+-What are questions do you have with their code (e.g., packages, techniques, functions)?
+
+Think back to readings (e.g., Wilke, Healy books) on good viz principles. Stronger results will be justified by some of our past readings (e.g., “one positive of the submission included Ogabe-Ito color scheme to be aware of color blindness as cited in Wilke Ch. 19”).
+
+### Answer 2
+
+-What are good design aspects?
+
+Among the visualization, there are a few advantageous design aspects, although it does not communicate effectively and meaningfully to the user. As it is difficult to interpret. The most obvious design elements are the large map of Africa, the countries are clearly divided and noticeable. Both mean and variance are captured and encoded using only a single color, where the key is clearly labeled at the bottom level of the map. The viewer can thus view this quickly to try and decode the visualization.
+
+-What are ways to improve this visualization?
+i- Using better color scheme
+ii- Using color scale
+iii- Using legend
+iv- Interactive country names using tooltip shows population and mean, i.e.
+v- Use other datasets to provide better information about malaria.
+
+
+One of the largest issues with tidytuesday malaria_deaths dataset visualization, belongs to the color. The tones used in the color become very difficult to decode, and it can become confusing, noticing which countries have high or low variance, and similarly the same issue with mean. 
+The information within the visualization, appears to also be very relative. It attempts to describe the severity of Malaria in African nations without actually listing how many deaths occur in the countries. This simply portrays whether a nation is better or worse off than each other. The subplot also does not make much sense, as there is no scale. Bivariate choropleth maps are also perceived as difficult to create and to interpret. One way to improve this visualization is to incorporate more data into it, so that further visualizations can be created. 
+
+As a result, we believe the visual can be improved in a few ways. First, concrete data about the actual number of deaths should be encoded into the color scale. Other interesting and relevant attributes can be encoded as well, such as prevalence  of malaria in each country.
+Second, while the “bivariate” color scale may capture a lot of information, we believe it is too confusing to actually benefit the viewer, and the visual is better off.
+
+-What are questions do you have with their code (e.g., packages, techniques, functions)?
+
+i- biscale: bivariate mapping was used to explain how do variance and average vary together?
+Bivariate choropleth maps are often perceived as difficult to create and interpret.
+
+
+The code was not very straightforward leaving us with many questions, while trying to interpret the original R code. One of the issue associated with their code still persists is bi_theme (base family=Changa_one)
+
+- Strong visualization principles 
+The original data set and visualization did incorporate strong principles. This included some of the following:
+    Making the raw data easily accessible
+    Keeping the graph as simple as is appropriate
+    Minimizing “ink” and maximizing data 
+    Using appropriate R packages 
+		
+
+
+### 3. Design a scenario/task
+Design a scenario/task using a visual analytics tools using flexdashboard, ggplot2, gganimate, htmlwidgets and/or shiny.
+
+Think about the following questions in your design process:
+
+-What are the tasks?
+
+All of the following left us with a few tasks. Three of the most important tasks included re-evaluating the original visualization using better color schemes, to make the bottom left graph much easier to evaluate and understand. The next was incorporating more datasets, so that more visualizations could be created. More visualizations allow the user to further understand the data and problems occurring. In this situation, how Malaria has fluctuated in the increase or decrease during the span of 16 years. 
+
+
+-What can/must be done using data analysis?
+
+Incorporating more data, this then enables the user to analyze more data, and create more visualizations with the data. 
+
+
+-What needs to be done interactively?
+maps and data points using plotly, tmap, ggplot, geom_sf, flexdashboard
+
+-How to best support the user in conducting the tasks?
+
+One of the best supports in conducting more visualizations tasks is incorporating more packages amongst R. These will allow more for visuals, and it will also make the users' job much more simple. A few examples of packages that we were able to use included: malaria Atlas, Autoplot, geom_plot, facet_wrap, ploty,  rworldmap, tidyverse, and many more. 
+
+-What needs to be visualized and how to best visualize it?
+
+Your goal is a dashboard on your scenario/task.
+
+For implementation, you should must use at least flexdashboard (recommended) but you can use shiny instead (or together), but shiny is optional.
+
+If you can’t figure out how to implement certain recommendations (e.g., certain types of interactions), then it’s okay to make notes. For this project, the goal is on design rather than implementation (though you’ll get a higher grade the more you can implement).
+
+For example, take a screen shot image of your flexdashboard and then (using powerpoint shapes/tool boxes) overlay changes you would like to modify if you had a broader set of tools (e.g., full knowledge of shiny, etc.).
+
+
+## This group's visualizations and analysis
+
+### Answer 3
+
+### Dataset1 Malaria Death Rates Between 1990 and 2016 
+### Dataset1 Design a scenario/task1
+
+```{r tidyverse modification}
+bi_map2 <- 
+  ggplot(sf_malaria_bi) +
+    geom_sf(data = sf_world %>% filter(continent == "Africa"),
+            color = "grey20",
+            fill = "grey70",
+            lwd = 0.2) +
+    geom_sf(aes(fill = bi_class), 
+            color = "grey20",
+            lwd = 0.2) +
+    bi_scale_fill(pal = "DkBlue", dim = 3, guide = F) +
+    scale_x_continuous(expand = c(0.03, 0.03)) +
+    scale_y_continuous(expand = c(0.03, 0.03), limits = c(-4200000, NA)) +
+    labs(x = NULL, y = NULL,
+         title = "Malaria Death Rates between 1990 and 2016",
+         subtitle = "A bivariate map showing mean and variance of annual Malaria death rates in African countries",
+         caption = "Visualization by Cédric Scherer  •  Data by World Health Organization (WHO) ")
+legend2 <- 
+  bi_legend(pal = "DkBlue",
+            dim = 3,
+            xlab = "Mean ",
+            ylab = "Variance ") +
+  # bi_theme(base_family = "Changa One") +
+  theme(rect = element_rect(fill = "grey10"),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        axis.title.x = element_text(size = 21,
+                                    color = "#BC7C8F"),
+        axis.title.y = element_text(size = 21,
+                                    color = "#89A1C8"))
+```
+
+
+```{r tidyverse modification2}
+map_legend2 <- 
+  ggdraw() +
+  draw_plot(bi_map2, 0, 0, 1, 1) +
+  draw_plot(legend2, 0.15, 0.25, 0.2, 0.2)
+
+```
+
+
+
+```{r map5, fig.width = 18, fig.height = 11.9}
+sf_malaria_bi5 <-
+  sf_malaria %>% 
+  filter(
+    continent == "Africa",
+    !is.na(Year)
+  ) %>% 
+  group_by(ISO_A3) %>% 
+  summarize(
+    medians=median(malaria_deaths, na.rm = F),
+    interquartile = IQR(malaria_deaths, na.rm = F)
+  ) %>% 
+  bi_class(x = medians, y = interquartile, style = "quantile", dim = 3)
+
+```
+
+
+
+```{r tidyverse modification5}
+bi_map5 <- 
+  ggplot(sf_malaria_bi5) +
+    geom_sf(data = sf_world %>% filter(continent == "Africa"),
+            color = "grey20",
+            fill = "grey70",
+            lwd = 0.2) +
+    geom_sf(aes(fill = bi_class), 
+            color = "grey20",
+            lwd = 0.2) +
+    bi_scale_fill(pal = "DkBlue", dim = 3, guide = F) +
+    scale_x_continuous(expand = c(0.03, 0.03)) +
+    scale_y_continuous(expand = c(0.03, 0.03), limits = c(-4200000, NA)) +
+    labs(x = NULL, y = NULL,
+         title = "Malaria Death Rates between 1990 and 2016",
+         subtitle = "A bivariate map showing median and interquartile of annual Malaria death rates in African countries")
+         
+legend5 <- 
+  bi_legend(pal = "DkBlue",
+            dim = 3,
+            xlab = "medians ",
+            ylab = "interquartile ") +
+  # bi_theme(base_family = "Changa One") +
+  theme(rect = element_rect(fill = "grey10"),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        axis.title.x = element_text(size = 21,
+                                    color = "#BC7C8F"),
+        axis.title.y = element_text(size = 21,
+                                    color = "#89A1C8"))
+```
+
+
+```{r map_legend tidyverse modification5}
+map_legend5 <- 
+  ggdraw() +
+  draw_plot(bi_map5, 0, 0, 1, 1) +
+  draw_plot(legend5, 0.15, 0.25, 0.2, 0.2)
+
+```
+
+
+
+
+
+```{r ggsave tidyverse color modiciation}
+
+ggsave(path="C:/Users/admin/Desktop/UNCC/Fall 2020/Assignments/5122/Group_Assignment_1/DSBA_5122",filename= "median_iqr_malaria_deaths_africa.pdf",plot = map_legend5, width = 15, height = 16.5, device = cairo_pdf)
+```
+
+
+### Dataset1 Design a scenario/task2
+
+
+```{r sf_malaria_Africa}
+
+sf_malaria_Africa <-
+  tbl_df(sf_malaria %>% 
+  filter(continent=='Africa',
+         !is.na(Year)) %>%
+  group_by(ISO_A3))
+
+sf_malaria_Africa_non_geom<-subset(sf_malaria_Africa, select = -c(geometry))
+
+```
+
+
+
+```{r sf_malaria_Africa_single_data}
+
+sf_malaria_Africa_single<-
+  sf_world %>% 
+  full_join(sf_malaria_Africa_non_geom, by = c("ISO_A3" = "ISO_A3"))%>%
+filter(!is.na(Year))
+
+```
+
+```{r summary2 sf_malaria_Africa_non_geom}
+summary(sf_malaria_Africa_non_geom)
+```
+
+
+```{r sf_malaria_Africa_single}
+plotly1<-ggplot(sf_malaria_Africa_single)+
+  geom_sf(aes(fill=malaria_deaths,label=Entity))+
+  scale_fill_viridis()
+  
+ p1<-ggplotly(plotly1)
+ 
+ p1
+```
+
+
+
+
+```{r sf_malaria_Africa_single tm}
+t1<-tm_shape(sf_malaria_Africa_single)+
+  tm_polygons('malaria_deaths',id='country', palette='Greens')
+t1
+```
+
+
+
+```{r plotly5}
+plotly5<-ggplot(sf_malaria_Africa_single, aes(Entity,malaria_deaths,color=Entity))+
+  geom_point(position = position_jitter(), size=0.5)+scale_fill_OkabeIto()+
+  theme_bw()+
+  theme(legend.position = 'none')+
+  facet_wrap(~ Year,nrow = 3, ncol=9)+
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+
+p5<-ggplotly(plotly5)
+
+p5
+
+```
+
+
+
+
+
+
+
+
+### Data Set2 Malaria Atlas 
+### Dataset2 Design a scenario/task1
+
+
+Five species of Plasmodium (single-celled parasites) can infect humans and cause illness
+
+
+```{r getPR, warning=F, message=F}
+Africa_pr<-(malariaAtlas::getPR(continent = 'Africa', species = 'BOTH'))
+
+autopr<-autoplot(Africa_pr)
+autopr
+```
+
+
+```{r ggsave Africa_pr}
+
+ggsave(path="C:/Users/admin/Desktop/UNCC/Fall 2020/Assignments/5122/Group_Assignment_1/DSBA_5122",filename= "Africa_pr.pdf",plot = autopr, width = 15, height = 16.5, device = cairo_pdf)
+```
+
+
+
+```{r Africa atlas2 and atlas3}
+Africa_atlas2 <-
+  tbl_df(Africa_pr %>% 
+  filter(!is.na(year_end),year_end >= 1990 & year_end <= 2016)%>%
+  group_by(year_end)) 
+
+Africa_atlas3<-subset(Africa_atlas2, select = c(country, country_id,year_end,examined,positive,pr, site_name))%>%
+unique()
+names(Africa_atlas3)[names(Africa_atlas3)=='country_id']<-'ISO_A3'
+names(Africa_atlas3)[names(Africa_atlas3)=='year_end']<-'Year'
+
+```
+
+
+```{r summary Africa_atlas3}
+summary(Africa_atlas3)
+```
+
+```{r Africa_Atlas_single_data}
+
+Africa_Atlas_single<-
+  sf_world %>% 
+  full_join(Africa_atlas3, by = c("ISO_A3" = "ISO_A3"))%>%
+filter(!is.na(Year))
+
+```
+```{r Africa_Atlas_single}
+plotly3<-ggplot(Africa_Atlas_single)+
+  geom_sf(aes(fill=pr, label=country))+
+  scale_fill_viridis("pr")
+p3<-ggplotly(plotly3)
+p3
+```
+
+
+
+
+```{r Africa_Atlas_ tm}
+t2<-tm_shape(Africa_Atlas_single)+
+  tm_polygons('pr',id='country', palette='Greens')
+t2
+```
+
+```{r plotly6}
+plotly6<-ggplot(Africa_Atlas_single, aes(country,pr,color=country))+
+  geom_point(position = position_jitter(), size=0.5, alpha=1)+
+  theme_bw()+
+  theme(legend.position = 'none')+
+  facet_wrap(~ Year,nrow = 3, ncol=9)+
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+
+p6<-ggplotly(plotly6)
+
+p6
+
+```
+
+
+### Data Set3 malaria incidence 
+### Dataset3 Design a scenario/task1
+
+
+
+```{r incidence malaria}
+incidence<-read.csv(file='data/incidence-of-malaria.csv')%>%filter(!is.na(Year))
+
+```
+
+```{r incidence_single_data}
+
+incidence_single<-
+  sf_world %>% 
+  full_join(incidence, by = c("ISO_A3" = "Code"))%>%
+filter(!is.na(Year),continent == "Africa")
+
+```
+
+```{r incidence_single sf}
+plotly4<-ggplot(incidence_single)+
+  geom_sf(aes(fill=Incidence.of.malaria..per.1.000.population.at.risk., label=Entity))+
+  scale_fill_viridis("Incidence.of.malaria..per.1.000.population.at.risk.")
+p4<-ggplotly(plotly4)
+p4
+```
+
+
+
+```{r incidence_single_tm}
+t3<-tm_shape(incidence_single)+
+  tm_polygons('Incidence.of.malaria..per.1.000.population.at.risk.',id='Entity', palette='Greens')
+t3
+
+```
+
+
+
+
+```{r plotly7}
+plotly7<-ggplot(incidence_single, aes(Entity,Incidence.of.malaria..per.1.000.population.at.risk.,color=Entity))+
+  geom_point(position = position_jitter(), size=1, alpha=1)+
+  theme_bw()+
+  scale_color_viridis_d()+
+  theme(legend.position = 'none')+
+  facet_wrap(~ Year)+
+  theme(axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+
+p7<-ggplotly(plotly7)
+
+p7
+
+```
+### Joined Dat_ DataSet1 and Dataset2 
+### Joined Dataset Design a scenario/task1
+
+#### Joining type is questionable!!!!!!! That is why I added data visualization with single 3 datasets. 
+
+Dataset2_There was more than one observation  for same "Year" per each country. Also, each country was subdivided into different sites.
+Dataset2 was very detailed as opposed to Dataset1 that has one "Year" observatiopn per country. Joining abovementioned datasets were not plausible since Dataset2 had more detailed information than the other ones. However, in order to practive visualization techniques, here in this report Dataset1 and Dataset2 were joined. The joined dataset (Dataset1 and Dataset2) are not cleaned and only aimed to provide visualization enrichment.
+
+
+
+### Merged Data Set: Africa_atlas3 modified from africaAtlas dataset and sf_malaria_Africa_non_geom modified from malaria_deaths dataset were joined. The aim is to provide malaria_deaths and pr in the same dataset.
+
+
+```{r join Africa_Atlas3 and sf_malaria_Africa_non_geom}
+Atmal <-
+full_join(Africa_atlas3,sf_malaria_Africa_non_geom, by = c("ISO_A3","Year"))%>%
+unique()
+
+Atmal<-Atmal%>%
+  filter(!is.na(pr))
+
+```
+
+
+
+
+
+```{r filter Atmal2}
+Atmal2<-
+  sf_world %>% 
+  full_join(Atmal, by = c("ISO_A3" = "ISO_A3"))%>%
+filter(!is.na(Year))
+
+```
+
+```{r filter pr Atmal2}
+Atmal2<-Atmal2%>%
+  filter(!is.na(pr))
+```
+
+
+```{r summary Atmal2}
+summary(Atmal2)
+```
+
+
+```{r summary2 Africa_atlas3}
+summary(Africa_atlas3)
+```
+
+
+```{r summary filter Africa_atlas}
+Africa_atlas3<-
+Africa_atlas3%>%
+  filter(!is.na(Year))
+summary(Africa_atlas3)
+```
+
+
+```{r summary sf_malaria_Africa_non_geom}
+summary(sf_malaria_Africa_non_geom)
+```
+
+
+
+```{r Atmal2 pr}
+plotly2<-ggplot(Atmal2)+
+  geom_sf(aes(fill=pr))+
+  scale_fill_gradient(low='#56B1F7', high='#132B43')
+ggplotly(plotly2)
+
+```
+
+
+```{r Atmal2 pr tm}
+tm_shape(Atmal2)+
+  tm_polygons('pr',id='country', palette='Greens')
+
+```
+
+
+
+
+
+```{r Atmal2 malaria_deaths tm}
+tm_shape(Atmal2)+
+  tm_polygons('malaria_deaths',id='country', palette='Greens')
+```
+
+
+
+
+
+```{r cool_plot1}
+cool_plot1<-ggplot(Atmal2, aes(pr,malaria_deaths))+
+  geom_point(mapping = aes(color=country),size=.2,position='jitter')+
+  scale_color_viridis_d()+
+  theme_bw()+
+  theme(legend.position = 'none')+
+  facet_wrap(~ Year)
+
+
+ggplotly(cool_plot1)  
+```
+
+```{r ggsave cool_plot1}
+
+ggsave(path="C:/Users/admin/Desktop/UNCC/Fall 2020/Assignments/5122/Group_Assignment_1/DSBA_5122",filename= "pr vs malaria_deaths.pdf",plot = cool_plot1, width = 15, height = 16.5, device = cairo_pdf)
+```
+
+
+
+
+
+```{r ggextension-custom 6, warning=F, message=F}
+ggplot(Atmal2,aes(pr, malaria_deaths,label=country, color=country))+ 
+  geom_point(position = position_jitter(), size=0.5, alpha=1,  show.legend=F)+
+  labs(x = "pr",y = "malaria_deaths") +
+  theme(plot.title = element_text(hjust = 0.5))+
+  coord_flip()+
+  facet_wrap(~Year)
+```
+
+
+## Presentation:
+
+Prepare a 7-8 minutes presentation to introduce your dataset, tidytuesday selection, design critique, and your suggested dashboard/improved version.
+
+### Answer to Presentation
+
+## Slides:
+
+Title page: 
+Dylan Edwards, Kevin Gharavizadeh, Matthew Flynn, Yusuf K. Demir; Ph.D.
+Dataset, Date
+Dataset & TidyTuesday Selection: Provide an overview of your dataset by showing the user’s TidyTuesday selection you choose. Be sure to provide a link/credit to whomever created this post.
+Critiques: What are good design choices? What are ways to improve the selected TidyTuesday entry?
+Modified Selection: Provide a screen shot or demo of your modified version of the TidyTuesday submission. What did you modify? What is the value add of your additional enhancements (e.g., what do your enhancements enable?)
+You can then provide either screenshots or your dashboard live. Likely not enough time for demo but you can try.
+
+The presentations will be given on June 25 in class.
+
+For your presentation, you will need to create slides for your presentation. You may use PowerPoint, Keynote, or try an R-based presentation tool (e.g., ioslides, slidy, or xaringan). I would strongly recommend xaringan. (See this RStudio Cloud project to play with xaringan) You will need to email me these slides.
+
+
+### Answer to Slides
+
+## Grading:
+
+You will be graded on the following criteria:
+
+Review of another’s #tidytuesday post (Recreate and Explain) (20%)
+Depth/insight of your critique of the #tidytuesday post (20%)
+The novelty (value add) of your suggested design/dashboard (20%)
+Quality of your dashboard (20%)
+Quality of the presentation (20%)
+Higher grades will include using a broader range of packages and adding in interactive or animated tools (e.g., enable shiny, gganimate, htmlwidgets like plotly) when appropriate. But don’t feel obligated to use shiny or any tools we hadn’t covered up to this point. My intention is to get you to think about ideally what you’d like to do; but not have all the skills yet to accomplish your goal (this is what the final project is for).
+
+However, please note, don’t just add interaction to add more complexity. You will need to justify why interaction or animation was necessary if you use these items.
+
+### Answer to Slides
+
+
+## Attribution:
+For this project, you can use/be inspired by others work, but whenever you use anything closely resembling someone else’s work, CITE YOUR SOURCE!!
+
+At minimum, you should provide the original individual’s full name and an active link to the place you found their work (e.g., Tweet, website/blog page, whatever). Any team found not citing will lose points and (depending on how much used) could face disclipinary actions. Therefore, when in doubt, err on the side of citing to avoid any possible complications.
+
+This is critical. You will need to replicate and build off their submission. Therefore, if you cannot find their code and/or have any issues replicating their results, then select a different submission.↩
+
+### Answer to Attribution
+
+https://gganimate.com/articles/gganimate.html
+https://gganimate.com/reference/transition_states.html
+https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/
+https://www.youtube.com/watch?v=ef8qvUeopN4&t=10s
+https://www.youtube.com/watch?v=HbkgAUOYvCY
+https://www.youtube.com/watch?v=wgFVmzSbaQc&t=283s
+https://www.youtube.com/watch?v=wgFVmzSbaQc&list=RDCMUCyhpw4-Etc79Sq77Swre5KA&start_radio=1&t=283
+https://www.youtube.com/watch?v=5_6O2oDy5Jk&t=249s
+https://github.com/Z3tt/TidyTuesday/blob/master/R/2018_33_Malaria.Rmd
+https://ourworldindata.org/malaria
+https://bookdown.org/yihui/rmarkdown-cookbook/hide-one.html
+Healy, Kieran, Data Visualization: A Practical Introduction. Princeton University Press, 2018.
+R library for malariaAtlas dataset
+
+
